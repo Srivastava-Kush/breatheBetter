@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: #f8faf9;
+  --foreground: #0f241d;
+  --card: #ffffff;
+  --card-foreground: #0f241d;
+  --popover: #ffffff;
+  --popover-foreground: #0f241d;
+  --primary: #106644;
+  --primary-foreground: #ffffff;
+  --secondary: #e6f3ed;
+  --secondary-foreground: #0e4c33;
+  --muted: #f0f5f2;
+  --muted-foreground: #5a756b;
+  --accent: #daf0e5;
+  --accent-foreground: #0e4c33;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #d4e3dc;
+  --input: #d4e3dc;
+  --ring: #106644;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: #091511;
+  --foreground: #edf5f1;
+  --card: #0f201a;
+  --card-foreground: #edf5f1;
+  --popover: #0f201a;
+  --popover-foreground: #edf5f1;
+  --primary: #22a370;
+  --primary-foreground: #061f15;
+  --secondary: #163228;
+  --secondary-foreground: #edf5f1;
+  --muted: #132b23;
+  --muted-foreground: #8aa99c;
+  --accent: #19382d;
+  --accent-foreground: #edf5f1;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #1b3d31;
+  --input: #1b3d31;
+  --ring: #22a370;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* AQI severity classes */
+.aqi-good { background-color: #009966; color: #ffffff; }
+.aqi-satisfactory { background-color: #55aa00; color: #ffffff; }
+.aqi-moderate { background-color: #ffde33; color: #1a1a1a; }
+.aqi-poor { background-color: #ff7e00; color: #ffffff; }
+.aqi-very-poor { background-color: #cc0033; color: #ffffff; }
+.aqi-severe { background-color: #7e0023; color: #ffffff; }
+.aqi-unknown { background-color: #9ca3af; color: #ffffff; }
+
+/* Leaflet maps container */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  font-family: inherit;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}

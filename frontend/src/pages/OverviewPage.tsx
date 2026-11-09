@@ -1,0 +1,304 @@
+import React from 'react';
+import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp } from 'lucide-react';
+import { useDashboard, useHistory } from '../hooks/useAirQuality';
+import { useAppStore } from '../stores/appStore';
+import { AQIGauge } from '../components/AQIGauge';
+import { PollutantCard } from '../components/ui/PollutantCard';
+import { FreshnessBadge } from '../components/ui/FreshnessBadge';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { formatDateTime } from '../utils';
+import type { PollutantReading } from '../types';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
+
+const DEFAULT_LOCATION_ID = 4663956; // Santushti Apartments, Vasant Kunj — fallback for demo
+
+function HistoryChart({ locationId }: { locationId: number }) {
+  const { data, isLoading } = useHistory(locationId, 24, 'pm25');
+
+  if (isLoading) return <div className="h-48 bg-muted/30 rounded animate-pulse" />;
+
+  const points = data?.data?.map((d) => ({
+    time: new Date(d.measurementUtc).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    }),
+    value: d.value,
+  })) ?? [];
+
+  if (points.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
+        No historical data available yet
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={points} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey="time" tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: 'hsl(var(--card))',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: 8,
+            fontSize: 12,
+          }}
+        />
+        <Line
+          type="monotone"
+          dataKey="value"
+          name="PM2.5 (µg/m³)"
+          stroke="#009966"
+          strokeWidth={2}
+          dot={false}
+          connectNulls={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function OverviewPage() {
+  const { selectedLocationId, recentLocations } = useAppStore();
+  const locationId = selectedLocationId ?? DEFAULT_LOCATION_ID;
+
+  const { data, isLoading, isError, refetch, isFetching } = useDashboard(locationId);
+
+  const dashboard = data?.data;
+  const aqi = dashboard?.aqi;
+  const health = dashboard?.health;
+  const pollutants = dashboard?.pollutants ?? {};
+  const location = dashboard?.location;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-64 bg-muted rounded" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="h-64 bg-muted rounded-xl" />
+            <div className="lg:col-span-2 h-64 bg-muted rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center gap-4 min-h-64">
+        <AlertCircle className="w-12 h-12 text-muted-foreground" />
+        <div className="text-center">
+          <h3 className="font-semibold">Unable to load dashboard</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            The backend may be starting up or the location is not yet synced.
+          </p>
+        </div>
+        <Button onClick={() => refetch()} variant="outline" size="sm">
+          <RefreshCw className="w-4 h-4" /> Try again
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+            <MapPin className="w-4 h-4" />
+            <span>{location?.name ?? 'Select a location'}</span>
+            {location?.locality && <span>· {location.locality}</span>}
+          </div>
+          <h1 className="text-2xl font-bold">Air Quality Overview</h1>
+          <p className="text-muted-foreground text-sm">
+            {new Date().toLocaleDateString('en-IN', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              timeZone: 'Asia/Kolkata',
+            })}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* AQI Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wind className="w-5 h-5 text-primary" />
+              Air Quality Index
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4">
+            <AQIGauge
+              aqi={aqi?.value ?? null}
+              category={aqi?.category ?? 'Unknown'}
+              size="lg"
+            />
+
+            {aqi && !aqi.isValid && (
+              <div className="w-full p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                <AlertCircle className="w-4 h-4 inline mr-1" />
+                {aqi.invalidReason ?? 'AQI unavailable'}
+              </div>
+            )}
+
+            {aqi?.isValid && aqi.dominantPollutant && (
+              <div className="text-center space-y-1">
+                <div className="text-xs text-muted-foreground">Dominant pollutant</div>
+                <Badge variant="default">{aqi.dominantPollutant.toUpperCase()}</Badge>
+              </div>
+            )}
+
+            <div className="text-xs text-center text-muted-foreground px-2">
+              {aqi?.displayLabel ?? 'No AQI data available'}
+            </div>
+
+            {aqi?.calculatedAt && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                Calculated {formatDateTime(aqi.calculatedAt)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Health Recommendation */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>{health?.emoji}</span>
+              Health Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {health ? (
+              <>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {health.general}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: '🏃 Outdoor Activity', text: health.outdoor },
+                    { label: '⚠️ Sensitive Groups', text: health.sensitiveGroups },
+                    { label: '🤸 Exercise', text: health.exercise },
+                    { label: '😷 Masks', text: health.masks },
+                  ].map(({ label, text }) => (
+                    <div key={label} className="p-3 rounded-lg bg-muted/30 space-y-1">
+                      <div className="text-xs font-semibold">{label}</div>
+                      <div className="text-xs text-muted-foreground">{text}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  Disclaimer: Health recommendations are general information only. Consult a healthcare professional for personal advice.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Health data unavailable. Select a location to see recommendations.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pollutants */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          Pollutant Readings
+          {Object.keys(pollutants).length === 0 && (
+            <span className="text-sm font-normal text-muted-foreground">
+              — No readings available
+            </span>
+          )}
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          {Object.entries(pollutants).map(([key, reading]) => (
+            <PollutantCard
+              key={key}
+              pollutant={key}
+              reading={reading as PollutantReading}
+            />
+          ))}
+        </div>
+        {Object.keys(pollutants).length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <Wind className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>No pollutant measurements available for this location.</p>
+            <p className="text-sm mt-1">
+              Data will appear after the first sync completes.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 24h PM2.5 Trend */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            PM2.5 — Last 24 Hours
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HistoryChart locationId={locationId} />
+          <p className="text-xs text-muted-foreground mt-2">
+            Hourly average measurements from OpenAQ ground sensors.
+            Gaps indicate missing or unavailable data for that period.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Recently viewed */}
+      {recentLocations.length > 0 && (
+        <div>
+          <h2 className="text-base font-semibold mb-3 text-muted-foreground">Recent Locations</h2>
+          <div className="flex flex-wrap gap-2">
+            {recentLocations.slice(0, 6).map((loc) => (
+              <button
+                key={loc.openaqId}
+                onClick={() => useAppStore.getState().setSelectedLocation(loc.openaqId)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border
+                           text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <MapPin className="w-3 h-3" />
+                {loc.name.split(',')[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
