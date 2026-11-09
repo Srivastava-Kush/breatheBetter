@@ -6,3 +6,4 @@ const router = Router();
 router.get('/:locationId', generateLocationInsights);
 
 export default router;
+

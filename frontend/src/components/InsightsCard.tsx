@@ -94,3 +94,4 @@ export function InsightsCard({ locationId }: InsightsCardProps) {
     </Card>
   );
 }
+

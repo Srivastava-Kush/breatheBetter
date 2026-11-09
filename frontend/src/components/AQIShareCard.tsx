@@ -203,3 +203,4 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
     </>
   );
 }
+

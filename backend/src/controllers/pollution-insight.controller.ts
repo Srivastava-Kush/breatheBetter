@@ -153,3 +153,4 @@ export async function generateLocationInsights(req: Request, res: Response): Pro
     res.status(500).json({ success: false, error: 'Failed to generate pollution insights' });
   }
 }
+

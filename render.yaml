@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: breathebetter-api
+    env: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: CLIENT_URL
+        value: https://breathebetter.vercel.app
+      - key: OPENAQ_BASE_URL
+        value: https://api.openaq.org/v3
+      - key: OPEN_METEO_ENABLED
+        value: true
+      - key: MONGODB_URI
+        sync: false
+      - key: OPENAQ_API_KEY
+        sync: false
