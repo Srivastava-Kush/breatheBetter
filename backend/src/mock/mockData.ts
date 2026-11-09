@@ -334,3 +334,4 @@ export function generateMockObservations(locationId: number): {
 
   return { latest, history, aqiSnapshot };
 }
+

@@ -1,13 +1,13 @@
-import React from 'react';
-import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp } from 'lucide-react';
-import { useDashboard, useHistory } from '../hooks/useAirQuality';
+import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp, BellRing } from 'lucide-react';
+import { useDashboard, useHistory, useAlerts } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { AQIGauge } from '../components/AQIGauge';
 import { PollutantCard } from '../components/ui/PollutantCard';
-import { FreshnessBadge } from '../components/ui/FreshnessBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { AQIShareCard } from '../components/AQIShareCard';
+import { InsightsCard } from '../components/InsightsCard';
 import { formatDateTime } from '../utils';
 import type { PollutantReading } from '../types';
 import {
@@ -78,12 +78,22 @@ export function OverviewPage() {
   const locationId = selectedLocationId ?? DEFAULT_LOCATION_ID;
 
   const { data, isLoading, isError, refetch, isFetching } = useDashboard(locationId);
+  const { data: alertsData } = useAlerts();
 
   const dashboard = data?.data;
   const aqi = dashboard?.aqi;
   const health = dashboard?.health;
   const pollutants = dashboard?.pollutants ?? {};
   const location = dashboard?.location;
+
+  const activeAlerts = (alertsData?.data ?? []).filter(
+    (a: any) =>
+      a.locationId === locationId &&
+      a.isActive &&
+      aqi?.value !== undefined &&
+      aqi.value !== null &&
+      aqi.value >= a.aqiThreshold
+  );
 
   if (isLoading) {
     return (
@@ -118,8 +128,26 @@ export function OverviewPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      {/* Active Threshold Alert Banner */}
+      {activeAlerts.length > 0 && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 text-rose-700 dark:text-rose-400">
+          <div className="flex items-center gap-3">
+            <BellRing className="w-5 h-5 shrink-0 animate-bounce" />
+            <div>
+              <div className="font-semibold text-sm">Smart Threshold Alert Triggered!</div>
+              <div className="text-xs opacity-90">
+                AQI at {location?.name} ({aqi?.value}) has exceeded your configured alert threshold of {activeAlerts[0].aqiThreshold}.
+              </div>
+            </div>
+          </div>
+          <span className="text-xs font-bold uppercase px-2.5 py-1 rounded bg-rose-500 text-white">
+            Threshold Exceeded
+          </span>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
             <MapPin className="w-4 h-4" />
@@ -137,15 +165,18 @@ export function OverviewPage() {
             })}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {dashboard && <AQIShareCard dashboard={dashboard} />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Main grid */}
@@ -231,6 +262,9 @@ export function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Pollution Insights */}
+      <InsightsCard locationId={locationId} />
 
       {/* Pollutants */}
       <div>

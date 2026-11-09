@@ -111,3 +111,4 @@ The frontend runs on `http://localhost:5173`. Requests to `/api/*` are automatic
 - **Open-Meteo:** Modelled air quality forecasts provided by Open-Meteo API under non-commercial CC BY 4.0. Modelled forecasts are clearly distinguished from ground observations.
 - **CPCB Methodology:** AQI calculations are performed by BreatheBetter using CPCB formulas and breakpoints. Displayed with attribution: `"BreatheBetter AQI — Calculated using CPCB methodology"`.
 - **OpenStreetMap:** Map tiles © OpenStreetMap contributors under ODbL.
+

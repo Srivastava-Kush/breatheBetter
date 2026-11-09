@@ -6,6 +6,7 @@ import {
   forecastApi,
   compareApi,
   alertsApi,
+  insightsApi,
 } from '../api/endpoints';
 
 // Keys
@@ -18,6 +19,7 @@ export const queryKeys = {
   forecast: (id: number) => ['forecast', id],
   compare: (ids: number[]) => ['compare', ids],
   alerts: () => ['alerts'],
+  insights: (id: number) => ['insights', id],
 };
 
 // Locations
@@ -74,6 +76,15 @@ export const useHistory = (
     queryFn: () => historyApi.get(locationId!, { hours, pollutant }),
     enabled: locationId !== null,
     staleTime: 10 * 60 * 1000,
+  });
+
+// AI Insights
+export const useInsights = (locationId: number | null) =>
+  useQuery({
+    queryKey: queryKeys.insights(locationId!),
+    queryFn: () => insightsApi.get(locationId!),
+    enabled: locationId !== null,
+    staleTime: 5 * 60 * 1000,
   });
 
 // Forecast

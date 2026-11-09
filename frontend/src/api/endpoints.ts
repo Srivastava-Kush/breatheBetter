@@ -86,6 +86,23 @@ export const healthApi = {
       .then((r) => r.data),
 };
 
+// AI Pollution Insights
+export const insightsApi = {
+  get: (locationId: number) =>
+    apiClient
+      .get<ApiResponse<{
+        stationName: string;
+        summary: string;
+        trend: 'improving' | 'worsening' | 'stable';
+        trendDescription: string;
+        peakHour: string | null;
+        pmRatio: { ratio: number | null; interpretation: string };
+        keyFindings: string[];
+        generatedAt: string;
+      }>>(`/insights/${locationId}`)
+      .then((r) => r.data),
+};
+
 // Compare
 export const compareApi = {
   compare: (locationIds: number[]) =>

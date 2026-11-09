@@ -13,15 +13,19 @@ import {
   X,
   Moon,
   Sun,
+  ShieldCheck,
+  Navigation,
 } from 'lucide-react';
 import { useState } from 'react';
 import { LocationSearch } from '../components/LocationSearch';
+import { locationsApi } from '../api/endpoints';
 import { useAppStore } from '../stores/appStore';
 import type { Location } from '../types';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: Wind, end: true },
   { to: '/map', label: 'Explore Map', icon: Map },
+  { to: '/clean-air', label: 'Clean Air Finder', icon: ShieldCheck },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/compare', label: 'Compare', icon: GitCompare },
   { to: '/health', label: 'Health', icon: Heart },
@@ -32,10 +36,35 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { darkMode, toggleDarkMode, addRecentLocation } = useAppStore();
+  const [locating, setLocating] = useState(false);
+  const { darkMode, toggleDarkMode, addRecentLocation, setSelectedLocation } = useAppStore();
 
   const handleLocationSelect = (loc: Location) => {
     addRecentLocation(loc);
+  };
+
+  const handleNearMe = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await locationsApi.nearby(pos.coords.latitude, pos.coords.longitude, 100);
+          if (res.data && res.data.length > 0) {
+            const nearest = res.data[0];
+            setSelectedLocation(nearest.openaqId);
+            addRecentLocation(nearest);
+          }
+        } catch (e) {
+          console.error('Failed to locate nearby station:', e);
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+      }
+    );
   };
 
   return (
@@ -134,8 +163,17 @@ export function Layout() {
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex-1 max-w-sm">
+          <div className="flex-1 max-w-md flex items-center gap-2">
             <LocationSearch onSelect={handleLocationSelect} />
+            <button
+              onClick={handleNearMe}
+              disabled={locating}
+              title="Find Nearest Station using GPS"
+              className="h-10 px-3 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+            >
+              <Navigation className={`w-3.5 h-3.5 text-primary ${locating ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Near Me</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './layout/Layout';
 import { OverviewPage } from './pages/OverviewPage';
 import { MapPage } from './pages/MapPage';
+import { CleanAirPage } from './pages/CleanAirPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { ComparePage } from './pages/ComparePage';
 import { HealthPage } from './pages/HealthPage';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<OverviewPage />} />
             <Route path="map" element={<MapPage />} />
+            <Route path="clean-air" element={<CleanAirPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="compare" element={<ComparePage />} />
             <Route path="health" element={<HealthPage />} />
