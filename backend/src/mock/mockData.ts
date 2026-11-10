@@ -1,5 +1,6 @@
 import { calculateCPCBAQI, getAQICategory } from '../utils/aqi-calculator';
 import { COMPLETE_INDIA_CATALOGUE } from './indiaCatalogue';
+import { COMPLETE_WORLD_CATALOGUE } from './worldCatalogue';
 
 export interface MockLocation {
   openaqId: number;
@@ -38,8 +39,11 @@ export interface MockObservation {
   freshnessStatus: 'Recent' | 'Delayed' | 'Possibly stale' | 'Stale';
 }
 
-// Complete pan-India monitoring station catalogue
-export const MOCK_LOCATIONS: MockLocation[] = COMPLETE_INDIA_CATALOGUE;
+// Complete pan-India and international monitoring station catalogue
+export const MOCK_LOCATIONS: MockLocation[] = [
+  ...COMPLETE_INDIA_CATALOGUE,
+  ...COMPLETE_WORLD_CATALOGUE,
+];
 
 // Specific baseline pollution profiles
 const STATION_BASE_PROFILES: Record<number, { pm25: number; pm10: number; no2: number; so2: number; co: number; o3: number }> = {
@@ -106,6 +110,25 @@ const STATION_BASE_PROFILES: Record<number, { pm25: number; pm10: number; no2: n
   4664188: { pm25: 55.0,  pm10: 102.0, no2: 26.0, so2: 8.0,  co: 0.7, o3: 42.0 }, // Bhubaneswar
   4664189: { pm25: 48.0,  pm10: 88.0,  no2: 24.0, so2: 9.0,  co: 0.7, o3: 45.0 }, // Visakhapatnam
   4664190: { pm25: 22.0,  pm10: 42.0,  no2: 16.0, so2: 6.0,  co: 0.5, o3: 35.0 }, // Thiruvananthapuram
+
+  // World Metropolitan Ground Stations
+  9000001: { pm25: 12.0,  pm10: 22.0,  no2: 18.0, so2: 4.0,  co: 0.4, o3: 32.0 }, // Tokyo, Japan
+  9000002: { pm25: 78.0,  pm10: 135.0, no2: 42.0, so2: 11.0, co: 1.1, o3: 28.0 }, // Beijing, China
+  9000003: { pm25: 18.0,  pm10: 32.0,  no2: 15.0, so2: 6.0,  co: 0.5, o3: 24.0 }, // Singapore
+  9000004: { pm25: 42.0,  pm10: 72.0,  no2: 32.0, so2: 8.0,  co: 0.7, o3: 26.0 }, // Seoul, South Korea
+  9000005: { pm25: 58.0,  pm10: 95.0,  no2: 28.0, so2: 7.0,  co: 0.8, o3: 30.0 }, // Bangkok, Thailand
+  9000006: { pm25: 8.0,   pm10: 16.0,  no2: 11.0, so2: 3.0,  co: 0.3, o3: 25.0 }, // Sydney, Australia
+  9000007: { pm25: 14.0,  pm10: 26.0,  no2: 24.0, so2: 5.0,  co: 0.4, o3: 35.0 }, // London, UK
+  9000008: { pm25: 16.0,  pm10: 28.0,  no2: 26.0, so2: 6.0,  co: 0.4, o3: 33.0 }, // Paris, France
+  9000009: { pm25: 13.0,  pm10: 23.0,  no2: 20.0, so2: 5.0,  co: 0.4, o3: 31.0 }, // Berlin, Germany
+  9000010: { pm25: 22.0,  pm10: 38.0,  no2: 31.0, so2: 7.0,  co: 0.5, o3: 40.0 }, // Rome, Italy
+  9000011: { pm25: 15.0,  pm10: 27.0,  no2: 22.0, so2: 5.0,  co: 0.4, o3: 38.0 }, // New York, USA
+  9000012: { pm25: 29.0,  pm10: 48.0,  no2: 34.0, so2: 6.0,  co: 0.7, o3: 52.0 }, // Los Angeles, USA
+  9000013: { pm25: 10.0,  pm10: 18.0,  no2: 16.0, so2: 4.0,  co: 0.3, o3: 30.0 }, // Toronto, Canada
+  9000014: { pm25: 64.0,  pm10: 165.0, no2: 38.0, so2: 12.0, co: 0.9, o3: 42.0 }, // Dubai, UAE
+  9000015: { pm25: 95.0,  pm10: 210.0, no2: 48.0, so2: 16.0, co: 1.4, o3: 36.0 }, // Cairo, Egypt
+  9000016: { pm25: 35.0,  pm10: 62.0,  no2: 25.0, so2: 9.0,  co: 0.6, o3: 28.0 }, // Johannesburg, South Africa
+  9000017: { pm25: 24.0,  pm10: 44.0,  no2: 28.0, so2: 7.0,  co: 0.6, o3: 35.0 }, // São Paulo, Brazil
 };
 
 /** Generate mock latest observations and hourly history */

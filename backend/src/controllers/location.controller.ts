@@ -13,7 +13,11 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
   try {
     const limit = Math.min(parseInt((req.query['limit'] as string) || '100', 10), 1000);
     const skip = parseInt((req.query['skip'] as string) || '0', 10);
-    const country = (req.query['country'] as string) || 'IN';
+    const countryQuery = req.query['country'] as string | undefined;
+    const country =
+      countryQuery === 'ALL' || countryQuery === 'global' || countryQuery === 'all'
+        ? undefined
+        : (countryQuery || 'IN');
     const search = req.query['search'] as string | undefined;
     const isMonitor = req.query['isMonitor'] !== undefined
       ? req.query['isMonitor'] === 'true'

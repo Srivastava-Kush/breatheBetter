@@ -23,10 +23,12 @@ import {
   Pause,
   Clock,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import { CitySearch, SelectedCity } from '../components/CitySearch';
 import { CityAirQualityPanel } from '../components/CityAirQualityPanel';
 import { StationMarkersLayer } from '../components/ClusterMapLayer';
+import { GlobalClusterMapLayer } from '../components/GlobalClusterMapLayer';
 import { HeatmapLayer } from '../components/HeatmapLayer';
 import { IndiaBoundaryLayer } from '../components/IndiaBoundaryLayer';
 
@@ -169,12 +171,40 @@ function MapViewportHandler({ targets }: { targets: Array<[number, number]> | nu
   return null;
 }
 
+function MapScopeController({ scope }: { scope: 'india' | 'global' }) {
+  const map = useMap();
+  const prevScopeRef = useRef(scope);
+
+  useEffect(() => {
+    if (prevScopeRef.current === scope) return;
+    prevScopeRef.current = scope;
+
+    if (scope === 'india') {
+      map.setMaxBounds(L.latLngBounds(INDIA_BOUNDS));
+      map.setMinZoom(4.5);
+      map.flyTo(INDIA_CENTER, 5.0, { duration: 1.2 });
+    } else {
+      map.setMaxBounds(null as any);
+      map.setMinZoom(2.0);
+      map.flyTo([25.0, 15.0], 2.5, { duration: 1.4 });
+    }
+  }, [scope, map]);
+
+  return null;
+}
+
 export function MapPage() {
   const navigate = useNavigate();
   const { setSelectedLocation } = useAppStore();
 
-  // Load all stations across India (up to 1000)
-  const { data, isLoading } = useLocations({ limit: 1000, country: 'IN' });
+  // Geographic Scope: 'india' (default, individual pins, locked bounds) vs 'global' (clustered worldwide)
+  const [geoScope, setGeoScope] = useState<'india' | 'global'>('india');
+
+  // Load all stations across India or Globally based on active scope
+  const { data, isLoading } = useLocations({
+    limit: 1000,
+    country: geoScope === 'india' ? 'IN' : 'global',
+  });
   const rawLocations = data?.data ?? [];
 
   // Filter States
@@ -380,6 +410,39 @@ export function MapPage() {
 
       {/* Secondary Controls Bar (Station Type, AQI Status, Halo) */}
       <div className="px-4 py-2 border-b border-border/60 bg-muted/30 flex items-center justify-between gap-2 overflow-x-auto text-xs">
+        {/* Geographic Scope Toggle: 🇮🇳 India Focus (Default) vs 🌍 Global Air */}
+        <div className="flex items-center gap-1 bg-card p-0.5 rounded-xl border border-border shadow-2xs shrink-0">
+          <button
+            onClick={() => {
+              setGeoScope('india');
+              setHighlightIndia(true);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              geoScope === 'india'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="India Focus: Sovereign Bounds Locked, Individual High-Res Pins (Default)"
+          >
+            <span>🇮🇳 India (Individual)</span>
+          </button>
+          <button
+            onClick={() => {
+              setGeoScope('global');
+              setHighlightIndia(false);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              geoScope === 'global'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Global Air: Worldwide Scope, Clustered Regulatory Stations"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>🌍 World (Clustered)</span>
+          </button>
+        </div>
+
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-muted-foreground font-medium flex items-center gap-1">
             <Filter className="w-3.5 h-3.5" />
@@ -478,14 +541,17 @@ export function MapPage() {
         <MapContainer
           center={INDIA_CENTER}
           zoom={5}
-          minZoom={4.5}
+          minZoom={geoScope === 'india' ? 4.5 : 2.0}
           maxZoom={18}
-          maxBounds={INDIA_BOUNDS}
-          maxBoundsViscosity={0.85}
+          maxBounds={geoScope === 'india' ? INDIA_BOUNDS : undefined}
+          maxBoundsViscosity={geoScope === 'india' ? 0.85 : 0.0}
           zoomControl={false}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
+          {/* Dynamic Map Scope & Bounds Controller */}
+          <MapScopeController scope={geoScope} />
+
           {tileLayerType === 'streets' ? (
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -500,17 +566,24 @@ export function MapPage() {
             />
           )}
 
-          {/* India Sovereign Boundary & Dimming Mask */}
-          <IndiaBoundaryLayer highlight={highlightIndia} />
+          {/* India Sovereign Boundary & Dimming Mask (active in India scope) */}
+          <IndiaBoundaryLayer highlight={highlightIndia && geoScope === 'india'} />
 
           {/* Continuous Multi-Point Pollution Heatmap Surface */}
           <HeatmapLayer locations={displayedLocations} visible={showHeatmap} />
 
-          {/* Individual Station Markers Layer with Real-Time CPCB AQI value pins (No clustering) */}
-          <StationMarkersLayer
-            locations={displayedLocations}
-            onSelectStation={handleSelectStation}
-          />
+          {/* Station Markers Layer: Individual Numeric Pins in India mode; Clustered in Global mode */}
+          {geoScope === 'india' ? (
+            <StationMarkersLayer
+              locations={displayedLocations}
+              onSelectStation={handleSelectStation}
+            />
+          ) : (
+            <GlobalClusterMapLayer
+              locations={displayedLocations}
+              onSelectStation={handleSelectStation}
+            />
+          )}
 
           {/* Interpolated dispersion halo rings if enabled */}
           {showHalo &&
