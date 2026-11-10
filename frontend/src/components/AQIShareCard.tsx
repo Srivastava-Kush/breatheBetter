@@ -23,7 +23,7 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
   const pm10 = dashboard.pollutants?.['pm10']?.value?.toFixed(1) ?? '—';
   const figureDetails = getAqiFigureDetails(aqiCat);
 
-  const generateCanvasImage = () => {
+  const generateCanvasImage = async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1200;
     canvas.height = 630;
@@ -85,7 +85,7 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
     ctx.roundRect(430, 270, 240, 220, 24);
     ctx.fill();
 
-    drawAqiFigureOnCanvas(ctx, aqiCat, 450, 280, 200);
+    await drawAqiFigureOnCanvas(ctx, aqiCat, 450, 280, 200);
 
     // 3. Pollutants & Health Action Panel
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';

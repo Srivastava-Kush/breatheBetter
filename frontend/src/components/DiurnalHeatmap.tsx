@@ -604,3 +604,4 @@ export function DiurnalHeatmap({
     </Card>
   );
 }
+
