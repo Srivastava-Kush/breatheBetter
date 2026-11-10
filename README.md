@@ -46,18 +46,38 @@ flowchart TD
 
 ---
 
-## 📊 Features Implemented
+## 📊 Complete Feature Matrix
 
+### Mandatory Features
 | # | Feature | Details | Status |
-|---|---|---|---|
-| **1** | **Live AQI Dashboard** | Real-time CPCB AQI gauge, dominant pollutant, individual pollutant cards, freshness indicators, and health recommendations | ✅ Complete |
-| **2** | **Interactive 2D Map** | Leaflet map of India with CPCB severity-colored markers, station popups, category filters, and geolocation | ✅ Complete |
-| **3** | **Historical Pollution Tracker** | 24h, 7d, 30d time filters, multi-pollutant line charts, gap preservation (no interpolation) | ✅ Complete |
-| **4** | **Location Comparison** | Compare up to 5 monitoring stations side-by-side without artificial cross-station averaging | ✅ Complete |
-| **5** | **Health & Safety Dashboard** | Guidance on outdoor cardio, masks (N95/N99), ventilation, and vulnerable groups | ✅ Complete |
-| **6** | **AQI Forecast (Open-Meteo)** | 7-day hourly forecast for PM2.5, PM10, NO₂, SO₂, CO, O₃ with distinct visual styling | ✅ Complete |
-| **7** | **AI Air Quality Assistant** | Conversational assistant grounded in live station data & CPCB guidelines | ✅ Complete |
-| **8** | **Smart AQI Alerts** | Create, update, and manage in-app threshold-based alerts per station | ✅ Complete |
+|---|---|---|:---:|
+| **A** | **Live AQI Dashboard** | Real-time CPCB AQI calculation; PM2.5, PM10, NO2, SO2, CO, O3 cards with severity labels; freshness indicator (`Recent`, `Delayed`, `Stale`); CPCB sub-index breakdown; `GET /api/aqi/dashboard/:locationId` | ✅ Complete |
+| **B** | **Interactive Air Quality Map** | Leaflet map with 89 ground stations; color-coded CPCB markers with actual AQI values; popup cards with detailed pollutant levels; auto-zoom & `fitBounds` on multi-station search; fallback to nearest regional ground stations; `GET /api/locations` | ✅ Complete |
+| **C** | **Historical Pollution Tracker** | Daily and hourly historical trends; PM2.5 vs PM10 comparisons; percentage change calculations (`% increase / decrease`); diagnostic card for missing historical telemetry; date range picker (24h, 7d, 30d); `GET /api/history/:locationId` | ✅ Complete |
+| **D** | **Location Comparison** | Compare up to 5 monitoring stations side-by-side with AQI delta rankings and pollutant-by-pollutant comparative bar charts; `GET /api/compare?ids=...` | ✅ Complete |
+| **E** | **Health & Safety Dashboard** | Guidance on outdoor cardio, masks (N95/N99), ventilation, and vulnerable groups; `GET /api/health-insights/:locationId` | ✅ Complete |
+| **F** | **AQI Forecast (Open-Meteo)** | 7-day hourly forecast for PM2.5, PM10, NO2, SO2, CO, O3 with distinct visual styling; `GET /api/forecast/:locationId` | ✅ Complete |
+
+### Bonus Features & UI/UX Innovations
+| # | Feature | Details | Status |
+|---|---|---|:---:|
+| **1** | **AI AQI Assistant** | Conversational bot grounded in real-time station telemetry and CPCB guidelines | ✅ Complete |
+| **2** | **Voice Assistant** | Web Speech API speech-to-text recording with microphone waveform animations and text-to-speech audio readouts | ✅ Complete |
+| **3** | **ML-Based Prediction** | Multi-factor hybrid auto-regressive + boundary-layer ventilation GBDT model predicting 24-hour trajectories, 90% confidence bands, and meteorological feature impact weights | ✅ Complete |
+| **4** | **CPCB Prediction Spectrum** | Dynamic vertical multi-stop SVG gradient coloring the predicted trajectory across CPCB thresholds (Good `#009966` to Severe `#7e0023`) | ✅ Complete |
+| **5** | **Continuous Pollution Heatmap** | Custom Gaussian radial density gradient heatmap layer rendered over the Leaflet map with interactive toggle | ✅ Complete |
+| **6** | **Predicted AQI Horizon Radar** | Bottom-centered timeline dock with steps (`Live`, `+3h`, `+6h`, `+12h`, `+18h`, `+24h`) and automated radar playback simulating diurnal atmospheric spread | ✅ Complete |
+| **7** | **India Boundary Restriction** | Map locked to subcontinent (`[6.0, 68.0]` to `[37.5, 97.5]`) with inverted world dimming mask and emerald frontier border glow | ✅ Complete |
+| **8** | **Tactile Map Markers** | 44px × 32px pill pins displaying actual numeric AQI values directly on the map with CPCB color-coding | ✅ Complete |
+| **9** | **Visual Meaning Figures** | Expressive SVG human activity figures (runner, walker, caution, N95 mask, air purifier, hazard shelter) in AQI display & Share Card | ✅ Complete |
+| **10** | **Subtle Pollutant Guide** | Plain-language educational guide for PM2.5, PM10, NO2, SO2, CO, O3, NH3 with microscopic size comparisons, sources, and health impacts | ✅ Complete |
+| **11** | **Statistical Anomaly Detection** | Z-score statistical engine ($Z > 2.5\sigma$) and rate-of-change tracker identifying industrial emission spikes and thermal inversions | ✅ Complete |
+| **12** | **Pollution Leaderboard** | Real-time national ranking tracking the Top 10 Cleanest vs Top 10 Most Polluted stations across India with zonal filtering | ✅ Complete |
+| **13** | **30-Day Impact Report** | Automated health impact report calculating WHO exceedance multiples, lung strain hazard scores, and one-click PDF export | ✅ Complete |
+| **14** | **Multi-API Weather Integration** | Real-time Open-Meteo Weather integration showing temperature, humidity, wind velocity, and boundary ventilation | ✅ Complete |
+| **15** | **Clean Air Finder** | Geospatial radius search (25km–250km) identifying cleaner atmospheric pockets with descriptive comparative intelligence | ✅ Complete |
+| **16** | **High-Res AQI Share Card** | Canvas 1200×630 PNG export with visual activity figure, key pollutants, and social sharing | ✅ Complete |
+| **17** | **Smart AQI Alerts** | User-configurable threshold alerts with active/inactive toggles and local notification feeds | ✅ Complete |
 
 ---
 

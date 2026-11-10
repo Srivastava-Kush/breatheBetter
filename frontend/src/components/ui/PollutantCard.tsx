@@ -1,4 +1,5 @@
 import React from 'react';
+import { HelpCircle } from 'lucide-react';
 import { POLLUTANT_DISPLAY } from '../../types';
 import { formatPollutantValue } from '../../utils';
 import type { PollutantReading } from '../../types';
@@ -8,6 +9,7 @@ interface PollutantCardProps {
   pollutant: string;
   reading: PollutantReading;
   compact?: boolean;
+  onOpenGuide?: (pollutant: string) => void;
 }
 
 const POLLUTANT_THRESHOLDS: Record<string, { good: number; moderate: number; poor: number }> = {
@@ -36,7 +38,12 @@ const LEVEL_COLORS = {
   severe: 'text-[#cc0033] bg-[#cc0033]/10',
 };
 
-export function PollutantCard({ pollutant, reading, compact = false }: PollutantCardProps) {
+export function PollutantCard({
+  pollutant,
+  reading,
+  compact = false,
+  onOpenGuide,
+}: PollutantCardProps) {
   const display = POLLUTANT_DISPLAY[pollutant] ?? { label: pollutant.toUpperCase(), unit: reading.unit };
   const level = getLevel(pollutant, reading.value);
   const colorClass = LEVEL_COLORS[level];
@@ -44,7 +51,18 @@ export function PollutantCard({ pollutant, reading, compact = false }: Pollutant
   if (compact) {
     return (
       <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-        <span className="text-sm font-medium">{display.label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium">{display.label}</span>
+          {onOpenGuide && (
+            <button
+              onClick={() => onOpenGuide(pollutant)}
+              className="text-muted-foreground/60 hover:text-primary transition-colors"
+              title={`Learn what ${display.label} means`}
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         <span className={`text-sm font-semibold px-2 py-0.5 rounded ${colorClass}`}>
           {reading.value.toFixed(1)} {display.unit}
         </span>
@@ -53,11 +71,22 @@ export function PollutantCard({ pollutant, reading, compact = false }: Pollutant
   }
 
   return (
-    <div className="p-4 rounded-xl border border-border bg-card space-y-2">
+    <div className="p-4 rounded-xl border border-border bg-card space-y-2 hover:border-border/80 transition-colors">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {display.label}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {display.label}
+          </span>
+          {onOpenGuide && (
+            <button
+              onClick={() => onOpenGuide(pollutant)}
+              className="text-muted-foreground/60 hover:text-primary transition-colors"
+              title={`Learn what ${display.label} means, sources & health risks`}
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorClass}`}>
           {level.charAt(0).toUpperCase() + level.slice(1)}
         </span>
@@ -74,4 +103,3 @@ export function PollutantCard({ pollutant, reading, compact = false }: Pollutant
     </div>
   );
 }
-

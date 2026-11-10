@@ -133,3 +133,48 @@ export async function searchLocationsByCity(city: string, isoCode = 'IN'): Promi
   }
 }
 
+/**
+ * Retrieve nearby stations using OpenAQ coordinates query:
+ * GET /v3/locations?coordinates={latitude},{longitude}&radius={radiusMeters}&iso=IN&limit=100&page={page}
+ */
+export async function fetchNearbyOpenAQLocations(
+  latitude: number,
+  longitude: number,
+  radiusMeters = 25000,
+  maxLocations = 100
+): Promise<OpenAQLocation[]> {
+  const allLocations: OpenAQLocation[] = [];
+  let page = 1;
+  const limit = 100;
+  let totalFound = Infinity;
+
+  while (allLocations.length < totalFound && allLocations.length < maxLocations) {
+    try {
+      const response = await rateLimitedRequest<OpenAQLocationsResponse>({
+        method: 'GET',
+        url: '/locations',
+        params: {
+          coordinates: `${latitude},${longitude}`,
+          radius: radiusMeters,
+          iso: 'IN',
+          limit,
+          page,
+        },
+      });
+
+      const { meta, results } = response.data;
+      totalFound = meta.found;
+      if (!results || results.length === 0) break;
+
+      allLocations.push(...results);
+      if (allLocations.length >= totalFound) break;
+      page++;
+    } catch (error) {
+      logger.error(`Nearby OpenAQ location fetch failed for (${latitude}, ${longitude}):`, error);
+      break;
+    }
+  }
+
+  return allLocations;
+}
+

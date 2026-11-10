@@ -6,13 +6,11 @@ interface AppState {
   selectedLocationId: number | null;
   recentLocations: Location[];
   compareLocationIds: number[];
-  darkMode: boolean;
   setSelectedLocation: (id: number | null) => void;
   addRecentLocation: (loc: Location) => void;
   addCompareLocation: (id: number) => void;
   removeCompareLocation: (id: number) => void;
   clearCompareLocations: () => void;
-  toggleDarkMode: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -21,7 +19,6 @@ export const useAppStore = create<AppState>()(
       selectedLocationId: null,
       recentLocations: [],
       compareLocationIds: [],
-      darkMode: false,
 
       setSelectedLocation: (id) => set({ selectedLocationId: id }),
 
@@ -49,8 +46,6 @@ export const useAppStore = create<AppState>()(
         })),
 
       clearCompareLocations: () => set({ compareLocationIds: [] }),
-
-      toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
     }),
     { name: 'breathebetter-store' }
   )

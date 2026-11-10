@@ -12,7 +12,6 @@ export function SettingsPage() {
   const createAlert = useCreateAlert();
   const deleteAlert = useDeleteAlert();
   const { data: locationsData } = useLocations({ limit: 50 });
-  const { darkMode, toggleDarkMode } = useAppStore();
 
   const [threshold, setThreshold] = useState('200');
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -41,25 +40,9 @@ export function SettingsPage() {
           Settings & Alerts
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Configure notifications, thresholds, and application preferences
+          Configure notifications, thresholds, and monitoring preferences
         </p>
       </div>
-
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Appearance</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-sm">Theme</div>
-            <div className="text-xs text-muted-foreground">Switch between light and dark modes</div>
-          </div>
-          <Button variant="outline" size="sm" onClick={toggleDarkMode}>
-            {darkMode ? 'Switch to Light' : 'Switch to Dark'}
-          </Button>
-        </CardContent>
-      </Card>
 
       {/* Smart AQI Alerts */}
       <Card>

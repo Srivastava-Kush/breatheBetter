@@ -1,0 +1,312 @@
+================================================================================
+BREATHEBETTER — DATA FETCHING ARCHITECTURE, API ENDPOINTS & SCHEMAS
+Platform: Real-Time Air Quality Intelligence Platform
+Challenge: Lets Code Diwali Challenge 2026 — Breathe Better
+================================================================================
+
+--------------------------------------------------------------------------------
+1. HOW DATA IS FETCHED & PROCESSED
+--------------------------------------------------------------------------------
+
+A. Upstream Data Sources:
+   1. OpenAQ API v3 (Primary Ground Observation Provider)
+      - Base URL: https://api.openaq.org/v3
+      - Header: X-API-Key: <OPENAQ_API_KEY> (Backend only, never exposed to client)
+      - Endpoint A: GET /locations?iso=IN&limit=100&page={page}
+        -> Discovers registered physical monitoring stations, coordinates, and sensors.
+      - Endpoint B: GET /locations/{location_id}/latest
+        -> Fetches latest readings. Does not return parameter names directly;
+           associated with location sensor metadata to resolve parameters and units.
+      - Endpoint C: GET /sensors/{sensor_id}/hours?datetime_from=...&datetime_to=...
+        -> Fetches hourly aggregated observations for 24h, 7d, and 30d trend lines.
+      - Rate Limit Management:
+        * Minimum 1050ms sequential pacing between requests to respect 60 req/min limit.
+        * Controlled concurrency (max 3 simultaneous location syncs via p-limit).
+        * Exponential backoff retry on transient 429 and 5xx responses.
+
+   2. Open-Meteo Air Quality API (Forecast Provider)
+      - Base URL: https://air-quality-api.open-meteo.com/v1/air-quality
+      - Parameters: latitude, longitude, hourly=pm10,pm2_5,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide,ozone,us_aqi,european_aqi, forecast_days=7
+      - No key required. Completely separate from ground stations.
+      - Labelled as "Modelled forecast" to avoid confusion with physical sensors.
+
+B. Data Processing & Ingestion Lifecycle:
+   - Ingestion Jobs (node-cron):
+     * Location Sync (every 6 hours): Upserts stations and sensor arrays into MongoDB.
+     * Latest Readings Sync (every 30 minutes): Fetches recent observations for monitoring stations.
+   - Normalization Layer:
+     * Transforms raw OpenAQ JSON into unified NormalizedObservation schema.
+     * Standardizes pollutant identifiers ('pm25', 'pm10', 'no2', 'so2', 'co', 'o3', 'nh3').
+     * Enforces strict unit validation (µg/m³ for particulates/gases, mg/m³ for CO).
+     * Calculates observation age (ageMinutes = currentUtc - measurementUtc) and status:
+       Recent (0–60 min), Delayed (1–3h), Possibly stale (3–6h), Stale (>6h).
+   - Local CPCB AQI Calculation Engine:
+     * Implements Central Pollution Control Board (CPCB) linear breakpoint interpolation.
+     * Requires minimum 3 valid sub-indices including PM2.5 or PM10.
+     * Requires at least 16 data points for a valid 24h average.
+     * Determines overall AQI from the maximum sub-index (Dominant Pollutant).
+     * Distinguishes calculated values with label: "BreatheBetter AQI — Calculated using CPCB methodology".
+   - Standalone / Fixture Mode:
+     * When MongoDB or OpenAQ credentials are unconfigured or offline, seamless in-memory fallback
+       operates without crashing, serving authentic real-world Indian station datasets.
+
+--------------------------------------------------------------------------------
+2. BACKEND API ENDPOINTS & RESPONSE STRUCTURES
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+[1] Health Check
+GET /api/health
+Description: Server status, timestamp, and version check.
+Response:
+{
+  "success": true,
+  "status": "ok",
+  "timestamp": "2026-11-09T09:34:21.554Z",
+  "version": "1.0.0",
+  "service": "BreatheBetter API"
+}
+
+--------------------------------------------------------------------------------
+[2] List Monitoring Locations
+GET /api/locations?limit=100&skip=0&country=IN&search={query}&isMonitor=true
+Description: Returns Indian monitoring stations with coordinates, sensors, and calculated latestAqi.
+Response:
+{
+  "success": true,
+  "meta": { "total": 10, "limit": 100, "skip": 0 },
+  "data": [
+    {
+      "openaqId": 4663956,
+      "name": "Santushti Apartments, Vasant Kunj",
+      "locality": "South West Delhi",
+      "timezone": "Asia/Kolkata",
+      "country": { "code": "IN", "name": "India" },
+      "owner": { "id": 1, "name": "CPCB / DPCC" },
+      "provider": { "id": 1, "name": "Delhi Pollution Control Committee" },
+      "isMobile": false,
+      "isMonitor": true,
+      "coordinates": { "latitude": 28.5266, "longitude": 77.1493 },
+      "sensors": [
+        { "id": 13273790, "name": "pm25", "parameter": { "id": 2, "name": "pm25", "units": "µg/m³", "displayName": "PM2.5" } }
+      ],
+      "latestAqi": {
+        "value": 318,
+        "category": "Very Poor",
+        "dominantPollutant": "pm25"
+      },
+      "lastSyncedAt": "2026-11-09T09:31:32.487Z"
+    }
+  ]
+}
+
+--------------------------------------------------------------------------------
+[3] Get Single Location
+GET /api/locations/:locationId
+Description: Detailed station metadata by OpenAQ ID.
+Response:
+{
+  "success": true,
+  "data": {
+    "openaqId": 4663956,
+    "name": "Santushti Apartments, Vasant Kunj",
+    "locality": "South West Delhi",
+    "coordinates": { "latitude": 28.5266, "longitude": 77.1493 },
+    "sensors": [...]
+  }
+}
+
+--------------------------------------------------------------------------------
+[4] Nearby Locations (Geospatial)
+GET /api/locations/nearby?lat=28.5266&lng=77.1493&radius=50&limit=20
+Description: Bounding box query around coordinates within radius in kilometers.
+Response:
+{
+  "success": true,
+  "data": [ { "openaqId": 4663956, "name": "...", "coordinates": { ... } } ]
+}
+
+--------------------------------------------------------------------------------
+[5] Live Dashboard Data
+GET /api/aqi/dashboard/:locationId
+Description: Complete station dashboard: CPCB AQI, all available pollutants, freshness, and health guidance.
+Response:
+{
+  "success": true,
+  "data": {
+    "location": {
+      "id": 4663956,
+      "name": "Santushti Apartments, Vasant Kunj",
+      "locality": "South West Delhi",
+      "country": { "code": "IN", "name": "India" },
+      "coordinates": { "latitude": 28.5266, "longitude": 77.1493 },
+      "isMonitor": true,
+      "isMobile": false,
+      "provider": { "id": 1, "name": "Delhi Pollution Control Committee" }
+    },
+    "aqi": {
+      "value": 318,
+      "category": "Very Poor",
+      "dominantPollutant": "pm25",
+      "subIndices": [
+        { "pollutant": "pm25", "value": 142.5, "subIndex": 318, "unit": "µg/m³", "averagingPeriodHours": 24, "dataPointsUsed": 24, "isValid": true },
+        { "pollutant": "pm10", "value": 248.0, "subIndex": 199, "unit": "µg/m³", "averagingPeriodHours": 24, "dataPointsUsed": 24, "isValid": true },
+        { "pollutant": "no2",  "value": 54.2,  "subIndex": 68,  "unit": "µg/m³", "averagingPeriodHours": 24, "dataPointsUsed": 24, "isValid": true }
+      ],
+      "isValid": true,
+      "invalidReason": null,
+      "calculatedAt": "2026-11-09T09:32:02.119Z",
+      "displayLabel": "BreatheBetter AQI — Calculated using CPCB methodology"
+    },
+    "pollutants": {
+      "pm25": { "value": 142.5, "unit": "µg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." },
+      "pm10": { "value": 248.0, "unit": "µg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." },
+      "no2":  { "value": 54.2,  "unit": "µg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." },
+      "so2":  { "value": 18.5,  "unit": "µg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." },
+      "co":   { "value": 1.8,   "unit": "mg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." },
+      "o3":   { "value": 38.0,  "unit": "µg/m³", "freshnessStatus": "Recent", "ageMinutes": 18, "measurementUtc": "..." }
+    },
+    "health": {
+      "category": "Very Poor",
+      "general": "Respiratory illness on prolonged exposure. Effects noticeable even in healthy individuals.",
+      "outdoor": "Avoid all unnecessary outdoor activity.",
+      "sensitiveGroups": "Sensitive groups must stay indoors. Seek medical attention if breathing difficulties arise.",
+      "exercise": "Do not exercise outdoors. Indoor activities only.",
+      "windows": "Keep all windows and doors closed. Run air purifiers on highest setting.",
+      "masks": "N95 or higher masks are strongly recommended if you must go outside.",
+      "color": "#cc0033",
+      "emoji": "🚫"
+    },
+    "dominantPollutantDescription": "Fine particulate matter (PM2.5) — tiny particles that can penetrate deep into the lungs and bloodstream."
+  }
+}
+
+--------------------------------------------------------------------------------
+[6] Historical Time-Series
+GET /api/history/:locationId?hours=168&pollutant=pm25
+Description: Time-series hourly averages. Gaps indicate missing measurements (not zeroed).
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "pollutant": "pm25",
+      "value": 138.4,
+      "unit": "µg/m³",
+      "measurementUtc": "2026-11-09T08:00:00.000Z",
+      "freshnessStatus": "Recent"
+    }
+  ],
+  "meta": { "locationId": 4663956, "pollutant": "pm25", "hours": 168, "count": 168 }
+}
+
+--------------------------------------------------------------------------------
+[7] Air Quality Forecast (Open-Meteo)
+GET /api/forecast/:locationId?days=7
+Description: 7-day hourly modelled projection from Open-Meteo.
+Response:
+{
+  "success": true,
+  "data": {
+    "hours": [
+      {
+        "time": "2026-11-09T14:00",
+        "pollutants": {
+          "pm25": 92.4,
+          "pm10": 145.0,
+          "no2": 31.2,
+          "so2": 24.1,
+          "co": 0.72,
+          "o3": 48.0,
+          "nh3": null
+        },
+        "usAqi": 170,
+        "europeanAqi": 78,
+        "source": "open-meteo",
+        "dataType": "forecast"
+      }
+    ],
+    "disclaimer": "Forecast data is a modelled estimate from Open-Meteo. It is not an official government reading."
+  }
+}
+
+--------------------------------------------------------------------------------
+[8] Location Comparison
+GET /api/compare?ids=4663956,4663960,4663970
+Description: Side-by-side comparison of 2 to 5 stations. No averaging across stations.
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "locationId": 4663956,
+      "stationName": "Santushti Apartments, Vasant Kunj",
+      "locality": "South West Delhi",
+      "aqi": { "value": 318, "category": "Very Poor", "dominantPollutant": "pm25" },
+      "pollutants": { "pm25": { "value": 142.5, "unit": "µg/m³" }, ... }
+    },
+    {
+      "locationId": 4663960,
+      "stationName": "Anand Vihar, Delhi",
+      "locality": "East Delhi",
+      "aqi": { "value": 428, "category": "Severe", "dominantPollutant": "pm25" },
+      "pollutants": { "pm25": { "value": 285.0, "unit": "µg/m³" }, ... }
+    },
+    {
+      "locationId": 4663970,
+      "stationName": "BTM Layout, Bengaluru",
+      "locality": "Bengaluru Urban",
+      "aqi": { "value": 53, "category": "Satisfactory", "dominantPollutant": "pm10" },
+      "pollutants": { "pm25": { "value": 28.0, "unit": "µg/m³" }, ... }
+    }
+  ],
+  "note": "Only compare values when units and pollutant types are compatible. No station averaging is performed."
+}
+
+--------------------------------------------------------------------------------
+[9] AI Pollution Insights
+GET /api/insights/:locationId
+Description: Algorithmic analysis of 24h trends, diurnal peak windows, and PM2.5/PM10 ratio.
+Response:
+{
+  "success": true,
+  "data": {
+    "stationName": "Santushti Apartments, Vasant Kunj",
+    "summary": "Air quality at Santushti Apartments, Vasant Kunj is currently Very Poor with an AQI of 318. Conditions are worsening compared to the previous 24 hours.",
+    "trend": "worsening",
+    "trendDescription": "PM2.5 concentrations have increased by 77% over the last 24 hours.",
+    "peakHour": "10:07 am",
+    "pmRatio": {
+      "ratio": 0.57,
+      "interpretation": "Balanced PM2.5/PM10 ratio (57%) reflects a combination of combustion emissions and mechanical dust."
+    },
+    "keyFindings": [
+      "Current air quality is categorized as Very Poor (AQI: 318) driven primarily by PM25.",
+      "Highest pollution spike over the last 24h occurred around 10:07 am.",
+      "Balanced PM2.5/PM10 ratio (57%) reflects a combination of combustion emissions and mechanical dust."
+    ],
+    "generatedAt": "2026-11-09T09:37:41.366Z"
+  }
+}
+
+--------------------------------------------------------------------------------
+[10] User Alerts Management
+GET    /api/alerts          -> Lists all active threshold alerts
+POST   /api/alerts          -> Creates a new alert { locationId, stationName, aqiThreshold, condition: 'above' }
+DELETE /api/alerts/:id      -> Deletes an alert by ID
+Response (POST):
+{
+  "success": true,
+  "data": {
+    "_id": "672f...",
+    "locationId": 4663956,
+    "stationName": "Santushti Apartments, Vasant Kunj",
+    "aqiThreshold": 200,
+    "condition": "above",
+    "pollutant": "aqi",
+    "isActive": true,
+    "createdAt": "2026-11-09T09:40:00.000Z"
+  }
+}
+================================================================================
+

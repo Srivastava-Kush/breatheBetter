@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { getForecast } from '../services/forecast.service';
+import { generateMLPrediction } from '../services/ml-prediction.service';
 import { getLocationById } from '../services/location.service';
 import { logger } from '../utils/logger';
 
@@ -40,4 +41,26 @@ export async function getLocationForecast(req: Request, res: Response): Promise<
     res.status(500).json({ success: false, error: 'Failed to retrieve forecast' });
   }
 }
+
+export async function getMLPredictionHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const locationId = parseInt(req.params['locationId'] as string, 10);
+    if (isNaN(locationId)) {
+      res.status(400).json({ success: false, error: 'Invalid location ID' });
+      return;
+    }
+
+    const prediction = await generateMLPrediction(locationId);
+    if (!prediction) {
+      res.status(404).json({ success: false, error: 'Unable to generate ML prediction for this location' });
+      return;
+    }
+
+    res.json({ success: true, data: prediction });
+  } catch (error) {
+    logger.error('getMLPredictionHandler error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate ML prediction' });
+  }
+}
+
 

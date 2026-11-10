@@ -11,8 +11,8 @@ import { logger } from '../utils/logger';
 
 export async function listLocations(req: Request, res: Response): Promise<void> {
   try {
-    const limit = Math.min(parseInt(req.query['limit'] as string || '100', 10), 500);
-    const skip = parseInt(req.query['skip'] as string || '0', 10);
+    const limit = Math.min(parseInt((req.query['limit'] as string) || '100', 10), 1000);
+    const skip = parseInt((req.query['skip'] as string) || '0', 10);
     const country = (req.query['country'] as string) || 'IN';
     const search = req.query['search'] as string | undefined;
     const isMonitor = req.query['isMonitor'] !== undefined
@@ -22,6 +22,14 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
       ? req.query['isMobile'] === 'true'
       : undefined;
 
+    let bbox: [number, number, number, number] | undefined;
+    if (req.query['bbox']) {
+      const parts = (req.query['bbox'] as string).split(',').map((p) => parseFloat(p.trim()));
+      if (parts.length === 4 && parts.every((p) => !isNaN(p))) {
+        bbox = parts as [number, number, number, number];
+      }
+    }
+
     const { locations, total } = await getLocationsFromDB({
       limit,
       skip,
@@ -29,6 +37,7 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
       search,
       isMonitor,
       isMobile,
+      bbox,
     });
 
     const locationsWithAqi = await Promise.all(

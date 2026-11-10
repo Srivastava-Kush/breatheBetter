@@ -92,3 +92,58 @@ export async function fetchForecast(
   }
 }
 
+export interface OpenMeteoCurrentReading {
+  time: string;
+  pm10: number | null;
+  pm2_5: number | null;
+  nitrogen_dioxide: number | null;
+  sulphur_dioxide: number | null;
+  carbon_monoxide: number | null;
+  ozone: number | null;
+  us_aqi: number | null;
+  european_aqi: number | null;
+  source: 'Open-Meteo Modelled Estimate';
+}
+
+/**
+ * Fetch current modelled air quality estimate from Open-Meteo.
+ * Strictly flagged as a modelled estimate — never confused with physical ground observations.
+ */
+export async function fetchCurrentModelledAirQuality(
+  latitude: number,
+  longitude: number
+): Promise<OpenMeteoCurrentReading | null> {
+  try {
+    const response = await axios.get<any>(
+      `${env.openMeteo.baseUrl}/air-quality`,
+      {
+        params: {
+          latitude,
+          longitude,
+          current: OPEN_METEO_POLLUTANTS,
+        },
+        timeout: 10000,
+      }
+    );
+
+    const c = response.data?.current;
+    if (!c) return null;
+
+    return {
+      time: c.time,
+      pm10: c.pm10 ?? null,
+      pm2_5: c.pm2_5 ?? null,
+      nitrogen_dioxide: c.nitrogen_dioxide ?? null,
+      sulphur_dioxide: c.sulphur_dioxide ?? null,
+      carbon_monoxide: c.carbon_monoxide ? c.carbon_monoxide / 1000 : null, // convert µg/m³ to mg/m³
+      ozone: c.ozone ?? null,
+      us_aqi: c.us_aqi ?? null,
+      european_aqi: c.european_aqi ?? null,
+      source: 'Open-Meteo Modelled Estimate',
+    };
+  } catch (error) {
+    logger.error(`Failed to fetch Open-Meteo current modelled reading for (${latitude}, ${longitude}):`, error);
+    return null;
+  }
+}
+

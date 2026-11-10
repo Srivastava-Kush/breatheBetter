@@ -49,28 +49,6 @@
   --radius: 0.75rem;
 }
 
-.dark {
-  --background: #091511;
-  --foreground: #edf5f1;
-  --card: #0f201a;
-  --card-foreground: #edf5f1;
-  --popover: #0f201a;
-  --popover-foreground: #edf5f1;
-  --primary: #22a370;
-  --primary-foreground: #061f15;
-  --secondary: #163228;
-  --secondary-foreground: #edf5f1;
-  --muted: #132b23;
-  --muted-foreground: #8aa99c;
-  --accent: #19382d;
-  --accent-foreground: #edf5f1;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #1b3d31;
-  --input: #1b3d31;
-  --ring: #22a370;
-}
-
 * {
   border-color: var(--border);
 }
@@ -113,4 +91,15 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/* Custom Tactical AQI Station Map Markers */
+.bb-station-marker-container {
+  background: transparent !important;
+  border: none !important;
+}
+.bb-station-marker-container:hover .bb-station-pin {
+  transform: scale(1.18);
+  z-index: 1000 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
 }

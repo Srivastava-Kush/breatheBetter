@@ -1,4 +1,5 @@
 import { calculateCPCBAQI, getAQICategory } from '../utils/aqi-calculator';
+import { COMPLETE_INDIA_CATALOGUE } from './indiaCatalogue';
 
 export interface MockLocation {
   openaqId: number;
@@ -37,218 +38,74 @@ export interface MockObservation {
   freshnessStatus: 'Recent' | 'Delayed' | 'Possibly stale' | 'Stale';
 }
 
-export const MOCK_LOCATIONS: MockLocation[] = [
-  {
-    openaqId: 4663956,
-    name: 'Santushti Apartments, Vasant Kunj',
-    locality: 'South West Delhi',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 1, name: 'CPCB / DPCC' },
-    provider: { id: 1, name: 'Delhi Pollution Control Committee' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 28.5266, longitude: 77.1493 },
-    sensors: [
-      { id: 13273790, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273791, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273792, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-      { id: 13273793, name: 'so2', parameter: { id: 9, name: 'so2', units: 'µg/m³', displayName: 'SO₂' } },
-      { id: 13273794, name: 'co', parameter: { id: 8, name: 'co', units: 'mg/m³', displayName: 'CO' } },
-      { id: 13273795, name: 'o3', parameter: { id: 7, name: 'o3', units: 'µg/m³', displayName: 'O₃' } },
-    ],
-    licenses: [{ name: 'CC BY 4.0', attribution: 'CPCB / DPCC via OpenAQ' }],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663960,
-    name: 'Anand Vihar, Delhi',
-    locality: 'East Delhi',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 1, name: 'DPCC' },
-    provider: { id: 1, name: 'Delhi Pollution Control Committee' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 28.6476, longitude: 77.3158 },
-    sensors: [
-      { id: 13273800, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273801, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273802, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-      { id: 13273803, name: 'so2', parameter: { id: 9, name: 'so2', units: 'µg/m³', displayName: 'SO₂' } },
-      { id: 13273804, name: 'co', parameter: { id: 8, name: 'co', units: 'mg/m³', displayName: 'CO' } },
-      { id: 13273805, name: 'o3', parameter: { id: 7, name: 'o3', units: 'µg/m³', displayName: 'O₃' } },
-    ],
-    licenses: [{ name: 'CC BY 4.0' }],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663965,
-    name: 'Bandra, Mumbai',
-    locality: 'Mumbai Suburban',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 2, name: 'MPCB' },
-    provider: { id: 2, name: 'Maharashtra Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 19.0596, longitude: 72.8295 },
-    sensors: [
-      { id: 13273810, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273811, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273812, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-      { id: 13273813, name: 'so2', parameter: { id: 9, name: 'so2', units: 'µg/m³', displayName: 'SO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663970,
-    name: 'BTM Layout, Bengaluru',
-    locality: 'Bengaluru Urban',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 3, name: 'KSPCB' },
-    provider: { id: 3, name: 'Karnataka State Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 12.9166, longitude: 77.6101 },
-    sensors: [
-      { id: 13273820, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273821, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273822, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663975,
-    name: 'Victoria Memorial, Kolkata',
-    locality: 'Kolkata',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 4, name: 'WBPCB' },
-    provider: { id: 4, name: 'West Bengal Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 22.5448, longitude: 88.3426 },
-    sensors: [
-      { id: 13273830, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273831, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273832, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663980,
-    name: 'Alandur Bus Depot, Chennai',
-    locality: 'Chennai',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 5, name: 'TNPCB' },
-    provider: { id: 5, name: 'Tamil Nadu Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 13.0012, longitude: 80.2014 },
-    sensors: [
-      { id: 13273840, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273841, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273842, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663985,
-    name: 'Sanathnagar, Hyderabad',
-    locality: 'Hyderabad',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 6, name: 'TSPCB' },
-    provider: { id: 6, name: 'Telangana State Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 17.4565, longitude: 78.4439 },
-    sensors: [
-      { id: 13273850, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273851, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273852, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663990,
-    name: 'Shivajinagar, Pune',
-    locality: 'Pune',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 2, name: 'MPCB' },
-    provider: { id: 2, name: 'Maharashtra Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 18.5314, longitude: 73.8446 },
-    sensors: [
-      { id: 13273860, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273861, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273862, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4663995,
-    name: 'Adarsh Nagar, Jaipur',
-    locality: 'Jaipur',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 7, name: 'RSPCB' },
-    provider: { id: 7, name: 'Rajasthan State Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 26.9011, longitude: 75.8277 },
-    sensors: [
-      { id: 13273870, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273871, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273872, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-  {
-    openaqId: 4664000,
-    name: 'Ardhali Bazar, Varanasi',
-    locality: 'Varanasi',
-    timezone: 'Asia/Kolkata',
-    country: { code: 'IN', name: 'India' },
-    owner: { id: 8, name: 'UPPCB' },
-    provider: { id: 8, name: 'Uttar Pradesh Pollution Control Board' },
-    isMobile: false,
-    isMonitor: true,
-    coordinates: { latitude: 25.3424, longitude: 82.9739 },
-    sensors: [
-      { id: 13273880, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
-      { id: 13273881, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
-      { id: 13273882, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
-    ],
-    licenses: [],
-    lastSyncedAt: new Date(),
-  },
-];
+// Complete pan-India monitoring station catalogue
+export const MOCK_LOCATIONS: MockLocation[] = COMPLETE_INDIA_CATALOGUE;
 
-// Base values by city profile
+// Specific baseline pollution profiles
 const STATION_BASE_PROFILES: Record<number, { pm25: number; pm10: number; no2: number; so2: number; co: number; o3: number }> = {
-  4663956: { pm25: 142.5, pm10: 248.0, no2: 54.2, so2: 18.5, co: 1.8, o3: 38.0 }, // Vasant Kunj - Very Poor
-  4663960: { pm25: 285.0, pm10: 440.0, no2: 92.0, so2: 24.0, co: 3.2, o3: 28.0 }, // Anand Vihar - Severe
-  4663965: { pm25: 64.0,  pm10: 118.0, no2: 42.0, so2: 12.0, co: 0.9, o3: 45.0 }, // Bandra - Moderate
-  4663970: { pm25: 28.0,  pm10: 52.0,  no2: 22.0, so2: 8.0,  co: 0.6, o3: 32.0 }, // Bengaluru - Good/Satisfactory
-  4663975: { pm25: 110.0, pm10: 195.0, no2: 58.0, so2: 15.0, co: 1.4, o3: 30.0 }, // Kolkata - Poor
-  4663980: { pm25: 42.0,  pm10: 78.0,  no2: 28.0, so2: 10.0, co: 0.7, o3: 40.0 }, // Chennai - Satisfactory
-  4663985: { pm25: 78.0,  pm10: 135.0, no2: 36.0, so2: 11.0, co: 1.1, o3: 35.0 }, // Hyderabad - Moderate
-  4663990: { pm25: 58.0,  pm10: 105.0, no2: 34.0, so2: 9.0,  co: 0.8, o3: 36.0 }, // Pune - Moderate
-  4663995: { pm25: 98.0,  pm10: 172.0, no2: 46.0, so2: 14.0, co: 1.2, o3: 32.0 }, // Jaipur - Poor
-  4664000: { pm25: 128.0, pm10: 220.0, no2: 48.0, so2: 16.0, co: 1.5, o3: 29.0 }, // Varanasi - Very Poor
+  // Prayagraj
+  4664101: { pm25: 118.0, pm10: 215.0, no2: 44.0, so2: 14.0, co: 1.3, o3: 34.0 }, // Jhusi
+  4664102: { pm25: 124.0, pm10: 228.0, no2: 48.0, so2: 15.0, co: 1.4, o3: 31.0 }, // Civil Lines
+  4664103: { pm25: 105.0, pm10: 195.0, no2: 38.0, so2: 12.0, co: 1.1, o3: 36.0 }, // Phaphamau
+  4664104: { pm25: 135.0, pm10: 245.0, no2: 52.0, so2: 18.0, co: 1.6, o3: 28.0 }, // Naini
+
+  // Lucknow
+  4664010: { pm25: 145.0, pm10: 255.0, no2: 56.0, so2: 19.0, co: 1.8, o3: 30.0 }, // Talkatora
+  4664112: { pm25: 152.0, pm10: 268.0, no2: 60.0, so2: 21.0, co: 1.9, o3: 27.0 }, // Lalbagh
+  4664113: { pm25: 120.0, pm10: 210.0, no2: 42.0, so2: 13.0, co: 1.2, o3: 35.0 }, // Gomti Nagar
+  4664114: { pm25: 130.0, pm10: 225.0, no2: 46.0, so2: 15.0, co: 1.4, o3: 32.0 }, // Aliganj
+
+  // Varanasi
+  4664000: { pm25: 128.0, pm10: 220.0, no2: 48.0, so2: 16.0, co: 1.5, o3: 29.0 }, // Ardhali Bazar
+  4664121: { pm25: 115.0, pm10: 202.0, no2: 42.0, so2: 13.0, co: 1.2, o3: 33.0 }, // Bhelupur
+  4664122: { pm25: 98.0,  pm10: 175.0, no2: 34.0, so2: 10.0, co: 1.0, o3: 38.0 }, // BHU
+  4664123: { pm25: 132.0, pm10: 230.0, no2: 50.0, so2: 17.0, co: 1.6, o3: 28.0 }, // Maldahiya
+
+  // Kanpur
+  4664131: { pm25: 162.0, pm10: 285.0, no2: 62.0, so2: 22.0, co: 2.1, o3: 26.0 }, // Nehru Nagar
+  4664132: { pm25: 155.0, pm10: 270.0, no2: 58.0, so2: 20.0, co: 1.9, o3: 28.0 }, // Kidwai Nagar
+  4664133: { pm25: 138.0, pm10: 240.0, no2: 48.0, so2: 16.0, co: 1.5, o3: 32.0 }, // Kalyanpur
+
+  // Patna
+  4664141: { pm25: 158.0, pm10: 278.0, no2: 54.0, so2: 18.0, co: 1.7, o3: 28.0 }, // Muradpur
+  4664142: { pm25: 142.0, pm10: 250.0, no2: 48.0, so2: 15.0, co: 1.5, o3: 30.0 }, // Danapur
+  4664143: { pm25: 135.0, pm10: 238.0, no2: 45.0, so2: 14.0, co: 1.3, o3: 33.0 }, // Rajbansi Nagar
+
+  // Delhi NCR
+  4663956: { pm25: 142.5, pm10: 248.0, no2: 54.2, so2: 18.5, co: 1.8, o3: 38.0 }, // Vasant Kunj
+  4663960: { pm25: 285.0, pm10: 440.0, no2: 92.0, so2: 24.0, co: 3.2, o3: 28.0 }, // Anand Vihar
+  4664151: { pm25: 175.0, pm10: 305.0, no2: 68.0, so2: 20.0, co: 2.2, o3: 30.0 }, // Punjabi Bagh
+  4664152: { pm25: 135.0, pm10: 235.0, no2: 50.0, so2: 16.0, co: 1.6, o3: 35.0 }, // RK Puram
+  4664153: { pm25: 195.0, pm10: 330.0, no2: 74.0, so2: 22.0, co: 2.4, o3: 26.0 }, // Sector 62 Noida
+
+  // Mumbai
+  4663965: { pm25: 64.0,  pm10: 118.0, no2: 42.0, so2: 12.0, co: 0.9, o3: 45.0 }, // Bandra
+  4664161: { pm25: 78.0,  pm10: 142.0, no2: 48.0, so2: 14.0, co: 1.1, o3: 38.0 }, // Kurla
+  4664162: { pm25: 45.0,  pm10: 82.0,  no2: 30.0, so2: 9.0,  co: 0.7, o3: 50.0 }, // Colaba
+  4664163: { pm25: 58.0,  pm10: 108.0, no2: 36.0, so2: 11.0, co: 0.8, o3: 42.0 }, // Borivali
+
+  // Bengaluru
+  4663970: { pm25: 28.0,  pm10: 52.0,  no2: 22.0, so2: 8.0,  co: 0.6, o3: 32.0 }, // BTM Layout
+  4664171: { pm25: 35.0,  pm10: 65.0,  no2: 26.0, so2: 9.0,  co: 0.7, o3: 30.0 }, // Hebbal
+  4664172: { pm25: 42.0,  pm10: 78.0,  no2: 32.0, so2: 11.0, co: 0.8, o3: 28.0 }, // Silk Board
+  4664173: { pm25: 31.0,  pm10: 58.0,  no2: 24.0, so2: 8.0,  co: 0.6, o3: 34.0 }, // Whitefield
+
+  // Other major cities
+  4663975: { pm25: 110.0, pm10: 195.0, no2: 58.0, so2: 15.0, co: 1.4, o3: 30.0 }, // Kolkata
+  4663980: { pm25: 42.0,  pm10: 78.0,  no2: 28.0, so2: 10.0, co: 0.7, o3: 40.0 }, // Chennai
+  4663985: { pm25: 78.0,  pm10: 135.0, no2: 36.0, so2: 11.0, co: 1.1, o3: 35.0 }, // Hyderabad
+  4663990: { pm25: 58.0,  pm10: 105.0, no2: 34.0, so2: 9.0,  co: 0.8, o3: 36.0 }, // Pune
+  4663995: { pm25: 98.0,  pm10: 172.0, no2: 46.0, so2: 14.0, co: 1.2, o3: 32.0 }, // Jaipur
+  4664181: { pm25: 88.0,  pm10: 160.0, no2: 42.0, so2: 13.0, co: 1.1, o3: 36.0 }, // Ahmedabad
+  4664182: { pm25: 72.0,  pm10: 130.0, no2: 32.0, so2: 10.0, co: 0.9, o3: 38.0 }, // Chandigarh
+  4664183: { pm25: 68.0,  pm10: 125.0, no2: 30.0, so2: 9.0,  co: 0.9, o3: 40.0 }, // Bhopal
+  4664184: { pm25: 122.0, pm10: 218.0, no2: 46.0, so2: 15.0, co: 1.4, o3: 31.0 }, // Agra
+  4664185: { pm25: 92.0,  pm10: 165.0, no2: 38.0, so2: 12.0, co: 1.1, o3: 34.0 }, // Patiala
+  4664186: { pm25: 52.0,  pm10: 95.0,  no2: 24.0, so2: 8.0,  co: 0.7, o3: 44.0 }, // Dehradun
+  4664187: { pm25: 62.0,  pm10: 112.0, no2: 28.0, so2: 9.0,  co: 0.8, o3: 38.0 }, // Guwahati
+  4664188: { pm25: 55.0,  pm10: 102.0, no2: 26.0, so2: 8.0,  co: 0.7, o3: 42.0 }, // Bhubaneswar
+  4664189: { pm25: 48.0,  pm10: 88.0,  no2: 24.0, so2: 9.0,  co: 0.7, o3: 45.0 }, // Visakhapatnam
+  4664190: { pm25: 22.0,  pm10: 42.0,  no2: 16.0, so2: 6.0,  co: 0.5, o3: 35.0 }, // Thiruvananthapuram
 };
 
 /** Generate mock latest observations and hourly history */
@@ -257,10 +114,26 @@ export function generateMockObservations(locationId: number): {
   history: any[];
   aqiSnapshot: any;
 } {
-  const profile = STATION_BASE_PROFILES[locationId] || { pm25: 85, pm10: 150, no2: 40, so2: 12, co: 1.0, o3: 35 };
   const loc = MOCK_LOCATIONS.find((l) => l.openaqId === locationId) || MOCK_LOCATIONS[0];
-  const now = new Date();
 
+  // Derive baseline profile
+  let profile = STATION_BASE_PROFILES[locationId];
+  if (!profile) {
+    // Generate geographically plausible baseline if unlisted
+    const lat = loc.coordinates.latitude;
+    if (lat > 24) {
+      // Northern / Gangetic plain
+      profile = { pm25: 115.0, pm10: 205.0, no2: 44.0, so2: 14.0, co: 1.3, o3: 32.0 };
+    } else if (lat > 16) {
+      // Central / Deccan
+      profile = { pm25: 65.0, pm10: 120.0, no2: 35.0, so2: 11.0, co: 0.9, o3: 38.0 };
+    } else {
+      // Southern / Coastal
+      profile = { pm25: 35.0, pm10: 65.0, no2: 22.0, so2: 8.0, co: 0.6, o3: 35.0 };
+    }
+  }
+
+  const now = new Date();
   const latest: Record<string, any> = {};
   const pollutants = ['pm25', 'pm10', 'no2', 'so2', 'co', 'o3'] as const;
 
@@ -288,7 +161,6 @@ export function generateMockObservations(locationId: number): {
   const history: any[] = [];
   for (let i = 168; i >= 0; i--) {
     const t = new Date(now.getTime() - i * 3600 * 1000);
-    // Add realistic diurnal cycle: peak in morning (8am) and evening (8pm)
     const hour = t.getHours();
     const cycleFactor = 1 + 0.35 * Math.sin(((hour - 4) * Math.PI) / 12) + (Math.sin(i * 0.2) * 0.1);
 
@@ -334,4 +206,3 @@ export function generateMockObservations(locationId: number): {
 
   return { latest, history, aqiSnapshot };
 }
-

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Wind,
   Map,
@@ -11,10 +11,10 @@ import {
   Settings,
   Menu,
   X,
-  Moon,
-  Sun,
   ShieldCheck,
   Navigation,
+  Trophy,
+  FileText,
 } from 'lucide-react';
 import { useState } from 'react';
 import { LocationSearch } from '../components/LocationSearch';
@@ -26,18 +26,22 @@ const NAV_ITEMS = [
   { to: '/', label: 'Overview', icon: Wind, end: true },
   { to: '/map', label: 'Explore Map', icon: Map },
   { to: '/clean-air', label: 'Clean Air Finder', icon: ShieldCheck },
+  { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/report', label: 'Impact Report', icon: FileText },
   { to: '/compare', label: 'Compare', icon: GitCompare },
   { to: '/health', label: 'Health', icon: Heart },
-  { to: '/forecast', label: 'Forecast', icon: CloudSun },
-  { to: '/assistant', label: 'AI Assistant', icon: Bot },
+  { to: '/forecast', label: 'Forecast & ML', icon: CloudSun },
+  { to: '/assistant', label: 'AI Voice Assistant', icon: Bot },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Layout() {
+  const location = useLocation();
+  const isMapPage = location.pathname === '/map';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { darkMode, toggleDarkMode, addRecentLocation, setSelectedLocation } = useAppStore();
+  const { addRecentLocation, setSelectedLocation } = useAppStore();
 
   const handleLocationSelect = (loc: Location) => {
     addRecentLocation(loc);
@@ -68,7 +72,7 @@ export function Layout() {
   };
 
   return (
-    <div className={`flex h-screen overflow-hidden ${darkMode ? 'dark' : ''}`}>
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border flex-shrink-0">
         <div className="p-6 border-b border-border">
@@ -103,14 +107,9 @@ export function Layout() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <button
-            onClick={toggleDarkMode}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full px-3 py-2 rounded-lg hover:bg-muted"
-          >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {darkMode ? 'Light mode' : 'Dark mode'}
-          </button>
+        <div className="p-4 border-t border-border text-[11px] text-muted-foreground/80 flex items-center justify-between">
+          <span>India AQI Platform</span>
+          <span className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded">v1.2</span>
         </div>
       </aside>
 
@@ -164,16 +163,18 @@ export function Layout() {
           </button>
 
           <div className="flex-1 max-w-md flex items-center gap-2">
-            <LocationSearch onSelect={handleLocationSelect} />
-            <button
-              onClick={handleNearMe}
-              disabled={locating}
-              title="Find Nearest Station using GPS"
-              className="h-10 px-3 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
-            >
-              <Navigation className={`w-3.5 h-3.5 text-primary ${locating ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Near Me</span>
-            </button>
+            {!isMapPage && <LocationSearch onSelect={handleLocationSelect} />}
+            {!isMapPage && (
+              <button
+                onClick={handleNearMe}
+                disabled={locating}
+                title="Find Nearest Station using GPS"
+                className="h-10 px-3 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+              >
+                <Navigation className={`w-3.5 h-3.5 text-primary ${locating ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Near Me</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

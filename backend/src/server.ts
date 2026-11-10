@@ -18,6 +18,7 @@ import compareRoutes from './routes/compare.routes';
 import insightRoutes from './routes/insight.routes';
 import pollutionInsightRoutes from './routes/pollution-insight.routes';
 import alertRoutes from './routes/alert.routes';
+import cityRoutes from './routes/city.routes';
 
 import { startLocationSyncJob } from './jobs/locationSync.job';
 import { startLatestReadingsJob } from './jobs/latestReadings.job';
@@ -74,6 +75,7 @@ async function bootstrap(): Promise<void> {
   app.use('/api/health-insights', insightRoutes);
   app.use('/api/insights', pollutionInsightRoutes);
   app.use('/api/alerts', alertRoutes);
+  app.use('/api/cities', cityRoutes);
 
   // Error handling
   app.use(notFound);

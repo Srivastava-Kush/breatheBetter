@@ -3,6 +3,7 @@ import { Share2, Download, Copy, Check, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { getAQIColorHex } from '../utils';
 import type { DashboardData, AQICategory } from '../types';
+import { AqiVisualFigure, drawAqiFigureOnCanvas, getAqiFigureDetails } from './AqiVisualFigure';
 
 interface AQIShareCardProps {
   dashboard: DashboardData;
@@ -20,6 +21,7 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
   const dominant = dashboard.aqi?.dominantPollutant?.toUpperCase() ?? 'PM2.5';
   const pm25 = dashboard.pollutants?.['pm25']?.value?.toFixed(1) ?? '—';
   const pm10 = dashboard.pollutants?.['pm10']?.value?.toFixed(1) ?? '—';
+  const figureDetails = getAqiFigureDetails(aqiCat);
 
   const generateCanvasImage = () => {
     const canvas = document.createElement('canvas');
@@ -58,44 +60,64 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
     ctx.font = '22px Inter, sans-serif';
     ctx.fillText(dashboard.location.locality ? `${dashboard.location.locality}, India` : 'India', 60, 225);
 
-    // AQI Pill box
+    const figureDetails = getAqiFigureDetails(aqiCat);
+
+    // 1. AQI Numerical Box
     ctx.fillStyle = aqiColor;
     ctx.beginPath();
-    ctx.roundRect(60, 270, 480, 220, 24);
+    ctx.roundRect(60, 270, 350, 220, 24);
     ctx.fill();
 
     // AQI Value inside box
     ctx.fillStyle = aqiCat === 'Moderate' ? '#111827' : '#ffffff';
-    ctx.font = 'bold 110px Inter, sans-serif';
-    ctx.fillText(String(aqiVal), 90, 390);
-
-    ctx.font = 'bold 36px Inter, sans-serif';
-    ctx.fillText(aqiCat, 90, 455);
-
     ctx.font = 'bold 20px Inter, sans-serif';
-    ctx.fillText('CPCB AQI', 400, 340);
+    ctx.fillText('CPCB AQI', 90, 315);
 
-    // Pollutants side panel
+    ctx.font = 'bold 100px Inter, sans-serif';
+    ctx.fillText(String(aqiVal), 90, 410);
+
+    ctx.font = 'bold 30px Inter, sans-serif';
+    ctx.fillText(aqiCat, 90, 460);
+
+    // 2. Visual Meaning Figure Center Panel
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.beginPath();
-    ctx.roundRect(580, 270, 560, 220, 24);
+    ctx.roundRect(430, 270, 240, 220, 24);
+    ctx.fill();
+
+    drawAqiFigureOnCanvas(ctx, aqiCat, 450, 280, 200);
+
+    // 3. Pollutants & Health Action Panel
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    ctx.roundRect(690, 270, 450, 220, 24);
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px Inter, sans-serif';
-    ctx.fillText('KEY READINGS', 620, 315);
+    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.fillText('KEY POLLUTANTS', 720, 310);
 
-    ctx.font = '18px Inter, sans-serif';
+    ctx.font = '16px Inter, sans-serif';
     ctx.fillStyle = '#a8c2b7';
-    ctx.fillText('PM2.5 (Fine Particles):', 620, 365);
-    ctx.fillText('PM10 (Coarse Dust):', 620, 410);
-    ctx.fillText('Dominant Pollutant:', 620, 455);
+    ctx.fillText('PM2.5:', 720, 345);
+    ctx.fillText('PM10:', 720, 375);
+    ctx.fillText('Dominant:', 720, 405);
 
-    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.font = 'bold 16px Inter, sans-serif';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${pm25} µg/m³`, 920, 365);
-    ctx.fillText(`${pm10} µg/m³`, 920, 410);
-    ctx.fillText(dominant, 920, 455);
+    ctx.fillText(`${pm25} µg/m³`, 830, 345);
+    ctx.fillText(`${pm10} µg/m³`, 830, 375);
+    ctx.fillText(dominant, 830, 405);
+
+    // Visual Action Badge Pill
+    ctx.fillStyle = aqiColor;
+    ctx.beginPath();
+    ctx.roundRect(720, 425, 390, 45, 12);
+    ctx.fill();
+
+    ctx.fillStyle = aqiCat === 'Moderate' ? '#111827' : '#ffffff';
+    ctx.font = 'bold 15px Inter, sans-serif';
+    ctx.fillText(figureDetails.badge, 735, 454);
 
     // Footer
     ctx.fillStyle = '#65867a';
@@ -163,7 +185,7 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
 
               <div className="flex items-center justify-between gap-4">
                 <div
-                  className="px-4 py-3 rounded-xl flex items-baseline gap-2 shadow-md"
+                  className="px-4 py-3 rounded-xl flex items-baseline gap-2 shadow-md shrink-0"
                   style={{
                     backgroundColor: aqiColor,
                     color: aqiCat === 'Moderate' ? '#111827' : '#ffffff',
@@ -173,11 +195,26 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
                   <span className="text-sm font-semibold">{aqiCat}</span>
                 </div>
 
-                <div className="text-right text-xs space-y-0.5 text-gray-300">
+                <div className="flex-1 flex justify-center">
+                  <AqiVisualFigure category={aqiCat} size="sm" showDetails={false} />
+                </div>
+
+                <div className="text-right text-xs space-y-0.5 text-gray-300 shrink-0">
                   <div>PM2.5: <strong className="text-white">{pm25} µg/m³</strong></div>
                   <div>PM10: <strong className="text-white">{pm10} µg/m³</strong></div>
                   <div>Dominant: <strong className="text-white">{dominant}</strong></div>
                 </div>
+              </div>
+
+              {/* Action Badge */}
+              <div
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-center shadow-xs"
+                style={{
+                  backgroundColor: aqiColor,
+                  color: aqiCat === 'Moderate' ? '#111827' : '#ffffff',
+                }}
+              >
+                {figureDetails.badge}
               </div>
 
               <div className="text-[10px] text-gray-400 pt-1 border-t border-white/10 flex justify-between">

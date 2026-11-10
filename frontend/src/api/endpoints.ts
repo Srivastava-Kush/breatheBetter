@@ -49,6 +49,21 @@ export const aqiApi = {
       .get<ApiResponse<unknown>>(`/aqi/current/${locationId}`)
       .then((r) => r.data),
 
+  weather: (locationId: number) =>
+    apiClient
+      .get<ApiResponse<{
+        temperatureC: number;
+        relativeHumidity: number;
+        windSpeedKmh: number;
+        windDirectionDeg: number;
+        surfacePressureHpa: number;
+        weatherCode: number;
+        weatherDescription: string;
+        dispersionConditions: 'favorable' | 'moderate' | 'poor' | 'stagnant';
+        dispersionExplanation: string;
+      }>>(`/aqi/weather/${locationId}`)
+      .then((r) => r.data),
+
   refresh: (locationId: number) =>
     apiClient.post(`/aqi/refresh/${locationId}`).then((r) => r.data),
 };
@@ -66,6 +81,35 @@ export const historyApi = {
         params: { hours },
       })
       .then((r) => r.data),
+
+  anomalies: (locationId: number, params?: { hours?: number; pollutant?: string }) =>
+    apiClient
+      .get<ApiResponse<{
+        locationId: number;
+        stationName: string;
+        analyzedHours: number;
+        dataPointsEvaluated: number;
+        totalAnomaliesDetected: number;
+        status: 'normal' | 'anomalous_spikes_detected' | 'severe_irregularity';
+        anomalies: Array<{
+          id: string;
+          timestamp: string;
+          pollutant: string;
+          observedValue: number;
+          expectedBaseline: number;
+          zScore: number;
+          type: string;
+          severity: 'low' | 'medium' | 'high' | 'critical';
+          title: string;
+          explanation: string;
+        }>;
+      }>>(`/history/anomalies/${locationId}`, { params })
+      .then((r) => r.data),
+
+  report: (locationId: number, days = 30) =>
+    apiClient
+      .get<ApiResponse<any>>(`/history/report/${locationId}`, { params: { days } })
+      .then((r) => r.data),
 };
 
 // Forecast
@@ -75,6 +119,32 @@ export const forecastApi = {
       .get<ApiResponse<ForecastData>>(`/forecast/${locationId}`, {
         params: { days },
       })
+      .then((r) => r.data),
+
+  mlPrediction: (locationId: number) =>
+    apiClient
+      .get<ApiResponse<{
+        modelType: string;
+        trainingFeatures: string[];
+        currentWeatherContext: {
+          windSpeedKmh: number;
+          temperatureC: number;
+          relativeHumidity: number;
+          dispersionConditions: string;
+        };
+        featureImportance: Array<{ feature: string; weightPercent: number; impact: string }>;
+        accuracyConfidenceScore: number;
+        hourlyPredictions: Array<{
+          hourOffset: number;
+          time: string;
+          predictedAqi: number;
+          predictedCategory: string;
+          predictedPm25: number;
+          confidenceLower: number;
+          confidenceUpper: number;
+          dominantInfluence: string;
+        }>;
+      }>>(`/forecast/ml-prediction/${locationId}`)
       .then((r) => r.data),
 };
 
@@ -110,6 +180,38 @@ export const compareApi = {
       .get<ApiResponse<unknown[]>>('/compare', {
         params: { ids: locationIds.join(',') },
       })
+      .then((r) => r.data),
+};
+
+// Cities (Open-Meteo Geocoding & City Air Quality)
+export const citiesApi = {
+  search: (q: string, countryCode = 'IN') =>
+    apiClient
+      .get<ApiResponse<Array<{
+        id: number;
+        name: string;
+        latitude: number;
+        longitude: number;
+        state?: string;
+        country: string;
+        district?: string;
+      }>>>('/cities/search', { params: { q, countryCode } })
+      .then((r) => r.data),
+
+  airQuality: (params: { lat: number; lng: number; radius?: number; name?: string; state?: string }) =>
+    apiClient
+      .get<ApiResponse<{
+        city: { name: string; state?: string; coordinates: { latitude: number; longitude: number }; searchRadiusKm: number };
+        overview: {
+          totalNearbyStations: number;
+          stationsWithRecentData: number;
+          validAqiStationsCount: number;
+          availablePollutants: string[];
+          aqiRange: { min: number; max: number } | null;
+        };
+        stations: any[];
+        modelledFallback: any | null;
+      }>>('/cities/air-quality', { params })
       .then((r) => r.data),
 };
 

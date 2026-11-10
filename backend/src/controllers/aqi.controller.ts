@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getLatestAQI, getLatestPollutants, updateLatestReadings } from '../services/aqi.service';
 import { getHealthRecommendation, getDominantPollutantDescription } from '../services/health.service';
 import { getLocationById } from '../services/location.service';
+import { fetchCurrentWeather } from '../providers/openmeteo/weather.api';
 import { logger } from '../utils/logger';
 import { AQICategory } from '../utils/aqi-calculator';
 
@@ -111,4 +112,36 @@ export async function refreshLocationData(req: Request, res: Response): Promise<
     res.status(500).json({ success: false, error: 'Refresh failed' });
   }
 }
+
+export async function getWeatherHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const locationId = parseInt(req.params['locationId'] as string, 10);
+    if (isNaN(locationId)) {
+      res.status(400).json({ success: false, error: 'Invalid location ID' });
+      return;
+    }
+
+    const location = await getLocationById(locationId);
+    if (!location) {
+      res.status(404).json({ success: false, error: 'Location not found' });
+      return;
+    }
+
+    const weather = await fetchCurrentWeather(
+      location.coordinates.latitude,
+      location.coordinates.longitude
+    );
+
+    if (!weather) {
+      res.status(503).json({ success: false, error: 'Weather conditions currently unavailable' });
+      return;
+    }
+
+    res.json({ success: true, data: weather });
+  } catch (error) {
+    logger.error('getWeatherHandler error:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve weather conditions' });
+  }
+}
+
 

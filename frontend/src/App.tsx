@@ -9,6 +9,8 @@ import { ComparePage } from './pages/ComparePage';
 import { HealthPage } from './pages/HealthPage';
 import { ForecastPage } from './pages/ForecastPage';
 import { AssistantPage } from './pages/AssistantPage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
+import { ReportPage } from './pages/ReportPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const queryClient = new QueryClient({
@@ -33,6 +35,8 @@ export default function App() {
             <Route path="compare" element={<ComparePage />} />
             <Route path="health" element={<HealthPage />} />
             <Route path="forecast" element={<ForecastPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route path="report" element={<ReportPage />} />
             <Route path="assistant" element={<AssistantPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

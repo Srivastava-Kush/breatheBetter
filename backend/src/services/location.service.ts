@@ -1,7 +1,8 @@
 import { Location, ILocation } from '../models/Location';
-import { fetchAllIndianLocations, fetchLocationById, OpenAQLocation } from '../providers/openaq/locations.api';
+import { fetchAllIndianLocations, fetchLocationById, fetchNearbyOpenAQLocations, OpenAQLocation } from '../providers/openaq/locations.api';
 import { isDbConnected } from '../config/database';
 import { MOCK_LOCATIONS } from '../mock/mockData';
+import { filterWithinRadius, isWithinBoundingBox, haversineDistanceKm } from '../utils/geo';
 import { logger } from '../utils/logger';
 
 /**
@@ -91,9 +92,25 @@ export async function getLocationsFromDB(options: {
   search?: string;
   isMonitor?: boolean;
   isMobile?: boolean;
+  bbox?: [number, number, number, number];
 }): Promise<{ locations: any[]; total: number }> {
   if (!isDbConnected) {
     let list = [...MOCK_LOCATIONS];
+    if (options.country) {
+      list = list.filter((l) => !l.country?.code || l.country.code === options.country);
+    }
+    if (options.isMonitor !== undefined) {
+      list = list.filter((l) => l.isMonitor === options.isMonitor);
+    }
+    if (options.isMobile !== undefined) {
+      list = list.filter((l) => l.isMobile === options.isMobile);
+    }
+    if (options.bbox) {
+      const [minLat, minLng, maxLat, maxLng] = options.bbox;
+      list = list.filter((l) =>
+        isWithinBoundingBox(l.coordinates.latitude, l.coordinates.longitude, minLat, minLng, maxLat, maxLng)
+      );
+    }
     if (options.search) {
       const q = options.search.toLowerCase();
       list = list.filter((l) => l.name.toLowerCase().includes(q) || (l.locality && l.locality.toLowerCase().includes(q)));
@@ -109,6 +126,11 @@ export async function getLocationsFromDB(options: {
   if (options.country) query['country.code'] = options.country;
   if (options.isMonitor !== undefined) query['isMonitor'] = options.isMonitor;
   if (options.isMobile !== undefined) query['isMobile'] = options.isMobile;
+  if (options.bbox) {
+    const [minLat, minLng, maxLat, maxLng] = options.bbox;
+    query['coordinates.latitude'] = { $gte: minLat, $lte: maxLat };
+    query['coordinates.longitude'] = { $gte: minLng, $lte: maxLng };
+  }
   if (options.search) {
     query['$text'] = { $search: options.search };
   }
@@ -123,7 +145,14 @@ export async function getLocationsFromDB(options: {
 
   // If DB is empty, provide mock locations
   if (locations.length === 0 && (!options.search || options.search.length === 0)) {
-    return { locations: MOCK_LOCATIONS, total: MOCK_LOCATIONS.length };
+    let fallbackList = [...MOCK_LOCATIONS];
+    if (options.bbox) {
+      const [minLat, minLng, maxLat, maxLng] = options.bbox;
+      fallbackList = fallbackList.filter((l) =>
+        isWithinBoundingBox(l.coordinates.latitude, l.coordinates.longitude, minLat, minLng, maxLat, maxLng)
+      );
+    }
+    return { locations: fallbackList.slice(options.skip ?? 0, (options.skip ?? 0) + (options.limit ?? 100)), total: fallbackList.length };
   }
 
   return { locations, total };
@@ -132,30 +161,58 @@ export async function getLocationsFromDB(options: {
 export async function getNearbyLocations(
   latitude: number,
   longitude: number,
-  radiusKm = 50,
+  radiusKm = 25,
   limit = 20
 ): Promise<any[]> {
-  if (!isDbConnected) {
-    return MOCK_LOCATIONS.slice(0, limit);
+  // 1. Try DB first if connected
+  if (isDbConnected) {
+    const latDelta = radiusKm / 111;
+    const lngDelta = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180));
+
+    const candidates = await Location.find({
+      'coordinates.latitude': {
+        $gte: latitude - latDelta,
+        $lte: latitude + latDelta,
+      },
+      'coordinates.longitude': {
+        $gte: longitude - lngDelta,
+        $lte: longitude + lngDelta,
+      },
+    }).limit(100);
+
+    if (candidates.length > 0) {
+      const filtered = filterWithinRadius(
+        candidates.map((c) => (typeof c.toObject === 'function' ? c.toObject() : c)),
+        latitude,
+        longitude,
+        radiusKm
+      );
+      if (filtered.length > 0) {
+        return filtered.slice(0, limit);
+      }
+    }
   }
 
-  const latDelta = radiusKm / 111;
-  const lngDelta = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180));
+  // 2. Try OpenAQ live API nearby discovery if key configured
+  try {
+    const liveNearby = await fetchNearbyOpenAQLocations(latitude, longitude, radiusKm * 1000, limit);
+    if (liveNearby && liveNearby.length > 0) {
+      const mapped = liveNearby.map((loc) => ({
+        ...loc,
+        openaqId: loc.id,
+        distanceKm: Math.round(
+          haversineDistanceKm(latitude, longitude, loc.coordinates.latitude, loc.coordinates.longitude) * 10
+        ) / 10,
+      }));
+      return mapped.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0)).slice(0, limit);
+    }
+  } catch (err) {
+    logger.warn('OpenAQ live nearby discovery failed, falling back to catalogue:', err);
+  }
 
-  const results = await Location.find({
-    'coordinates.latitude': {
-      $gte: latitude - latDelta,
-      $lte: latitude + latDelta,
-    },
-    'coordinates.longitude': {
-      $gte: longitude - lngDelta,
-      $lte: longitude + lngDelta,
-    },
-  })
-    .limit(limit)
-    .sort({ name: 1 });
-
-  return results.length > 0 ? results : MOCK_LOCATIONS.slice(0, 5);
+  // 3. Fallback to comprehensive in-memory catalogue with real Haversine distance
+  const catalogueFiltered = filterWithinRadius(MOCK_LOCATIONS, latitude, longitude, radiusKm);
+  return catalogueFiltered.slice(0, limit);
 }
 
 export async function searchLocations(query: string): Promise<any[]> {

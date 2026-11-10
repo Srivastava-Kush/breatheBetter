@@ -1,172 +1,350 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Circle } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useLocations } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
-import { getAQIColorHex } from '../utils';
-import type { Location, AQICategory } from '../types';
-import { MapPin, Navigation, Layers, Clock, Info } from 'lucide-react';
+import { getAQIColorHex, getAQICategory } from '../utils';
+import type { AQICategory, Location } from '../types';
+import {
+  MapPin,
+  Navigation,
+  Layers,
+  Filter,
+  Check,
+  SlidersHorizontal,
+  Plus,
+  Minus,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  Play,
+  Pause,
+  Clock,
+  Sparkles,
+} from 'lucide-react';
+import { CitySearch, SelectedCity } from '../components/CitySearch';
+import { CityAirQualityPanel } from '../components/CityAirQualityPanel';
+import { ClusterMapLayer } from '../components/ClusterMapLayer';
+import { HeatmapLayer } from '../components/HeatmapLayer';
+import { IndiaBoundaryLayer } from '../components/IndiaBoundaryLayer';
 
 const INDIA_CENTER: [number, number] = [22.5937, 78.9629];
+const INDIA_BOUNDS: L.LatLngBoundsLiteral = [
+  [6.0, 68.0],
+  [37.5, 97.5],
+];
 
-const getMarkerColor = (category: string | null | undefined): string => {
-  if (!category) return '#9ca3af';
-  return getAQIColorHex(category as AQICategory);
-};
-
-function LocateMe() {
+function FloatingMapControls({
+  mapContainerRef,
+  tileLayerType,
+  onToggleTileLayer,
+}: {
+  mapContainerRef: React.RefObject<HTMLDivElement | null>;
+  tileLayerType: 'streets' | 'satellite';
+  onToggleTileLayer: () => void;
+}) {
   const map = useMap();
-  const handleLocate = () => {
-    navigator.geolocation?.getCurrentPosition((pos) => {
-      map.setView([pos.coords.latitude, pos.coords.longitude], 12);
-    });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const handleZoomIn = () => map.zoomIn();
+  const handleZoomOut = () => map.zoomOut();
+  const handleReset = () => {
+    map.flyTo(INDIA_CENTER, 5, { duration: 1.2 });
   };
+  const handleLocate = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 12, { duration: 1.5 });
+      },
+      () => {
+        setIsLocating(false);
+      }
+    );
+  };
+  const handleToggleFullscreen = () => {
+    if (!mapContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      mapContainerRef.current.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+
   return (
-    <button
-      onClick={handleLocate}
-      className="absolute bottom-24 right-3 z-[1000] p-2 bg-card rounded-lg shadow-md border border-border hover:bg-muted text-foreground transition-colors"
-      title="My Location"
-    >
-      <Navigation className="w-4 h-4 text-primary" />
-    </button>
+    <div className="absolute top-4 right-4 z-[1000] flex flex-col items-center gap-2 select-none">
+      {/* Zoom In & Out */}
+      <div className="flex flex-col rounded-xl overflow-hidden shadow-lg border border-border/80 bg-card/95 backdrop-blur-md">
+        <button
+          onClick={handleZoomIn}
+          className="p-2.5 hover:bg-muted text-foreground transition-colors border-b border-border/60"
+          title="Zoom In"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-2.5 hover:bg-muted text-foreground transition-colors"
+          title="Zoom Out"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Locate Me GPS */}
+      <button
+        onClick={handleLocate}
+        disabled={isLocating}
+        className={`p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all hover:scale-105 ${
+          isLocating ? 'animate-pulse text-primary' : ''
+        }`}
+        title="Find My Location (GPS)"
+      >
+        <Navigation className={`w-4 h-4 ${isLocating ? 'text-primary' : 'text-foreground'}`} />
+      </button>
+
+      {/* Reset to Pan-India Overview */}
+      <button
+        onClick={handleReset}
+        className="p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all hover:scale-105"
+        title="Reset to Pan-India Overview"
+      >
+        <RotateCcw className="w-4 h-4 text-foreground" />
+      </button>
+
+      {/* Satellite Imagery / Street Map Toggle */}
+      <button
+        onClick={onToggleTileLayer}
+        className={`p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted transition-all hover:scale-105 ${
+          tileLayerType === 'satellite' ? 'text-emerald-700 bg-emerald-50 border-emerald-300' : 'text-foreground'
+        }`}
+        title={tileLayerType === 'satellite' ? 'Switch to Street Map' : 'Switch to Satellite Imagery'}
+      >
+        <Layers className="w-4 h-4" />
+      </button>
+
+      {/* Fullscreen Toggle */}
+      <button
+        onClick={handleToggleFullscreen}
+        className="p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all hover:scale-105"
+        title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+      >
+        {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+      </button>
+    </div>
   );
 }
 
-function StationMarker({ location, showHalo }: { location: Location; showHalo: boolean }) {
-  const aqi = location.latestAqi;
-  const color = getMarkerColor(aqi?.category);
-  const { setSelectedLocation } = useAppStore();
-  const navigate = useNavigate();
+function MapViewportHandler({ targets }: { targets: Array<[number, number]> | null }) {
+  const map = useMap();
 
-  const handleViewStation = () => {
-    setSelectedLocation(location.openaqId);
+  useEffect(() => {
+    if (!targets || targets.length === 0) return;
+
+    if (targets.length === 1) {
+      map.flyTo(targets[0], 12, { duration: 1.2 });
+    } else {
+      const bounds = L.latLngBounds(targets.map((c) => L.latLng(c[0], c[1])));
+      map.fitBounds(bounds, {
+        padding: [60, 60],
+        maxZoom: 13,
+        animate: true,
+      });
+    }
+  }, [targets, map]);
+
+  return null;
+}
+
+export function MapPage() {
+  const navigate = useNavigate();
+  const { setSelectedLocation } = useAppStore();
+
+  // Load all stations across India (up to 1000)
+  const { data, isLoading } = useLocations({ limit: 1000, country: 'IN' });
+  const rawLocations = data?.data ?? [];
+
+  // Filter States
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [monitorFilter, setMonitorFilter] = useState<'all' | 'reference' | 'sensors'>('all');
+  const [aqiFilter, setAqiFilter] = useState<'all' | 'valid' | 'unavailable'>('all');
+  const [showHalo, setShowHalo] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [highlightIndia, setHighlightIndia] = useState(true);
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+
+  // Selected City & Viewport target
+  const [selectedCity, setSelectedCity] = useState<SelectedCity | null>(null);
+  const [viewportTargets, setViewportTargets] = useState<Array<[number, number]> | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [tileLayerType, setTileLayerType] = useState<'streets' | 'satellite'>('streets');
+
+  // Apply filters
+  const filteredLocations = rawLocations.filter((loc) => {
+    // 1. AQI Category filter
+    if (selectedCategory && loc.latestAqi?.category !== selectedCategory) {
+      return false;
+    }
+
+    // 2. Monitor type filter
+    if (monitorFilter === 'reference' && !loc.isMonitor) return false;
+    if (monitorFilter === 'sensors' && loc.isMonitor) return false;
+
+    // 3. AQI validity filter
+    if (aqiFilter === 'valid' && !loc.latestAqi) return false;
+    if (aqiFilter === 'unavailable' && loc.latestAqi) return false;
+
+    return true;
+  });
+
+  // Forecast Time Horizon Slider (0 = Live, 3, 6, 12, 18, 24 hours into future)
+  const [timeHorizon, setTimeHorizon] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setTimeHorizon((prev) => {
+        const steps = [0, 3, 6, 12, 18, 24];
+        const nextIdx = (steps.indexOf(prev) + 1) % steps.length;
+        return steps[nextIdx];
+      });
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  // Project locations based on timeHorizon
+  const displayedLocations = useMemo(() => {
+    if (timeHorizon === 0) return filteredLocations;
+
+    return filteredLocations.map((loc) => {
+      if (!loc.latestAqi || !loc.latestAqi.value) return loc;
+
+      const baseAqi = loc.latestAqi.value;
+      const now = new Date();
+      const futureHour = (now.getHours() + timeHorizon) % 24;
+
+      let diurnalFactor = 1.0;
+      if (futureHour >= 7 && futureHour <= 10) {
+        diurnalFactor = 1.20; // Morning traffic surge
+      } else if (futureHour >= 12 && futureHour <= 16) {
+        diurnalFactor = 0.74; // Solar boundary layer dispersion
+      } else if (futureHour >= 18 && futureHour <= 21) {
+        diurnalFactor = 1.26; // Evening peak emissions
+      } else if (futureHour >= 23 || futureHour <= 5) {
+        diurnalFactor = 1.16; // Nighttime thermal inversion
+      } else {
+        diurnalFactor = 0.94;
+      }
+
+      // Indo-Gangetic regional modifier
+      if (
+        loc.coordinates.latitude > 24.0 &&
+        loc.coordinates.latitude < 30.0 &&
+        (futureHour >= 21 || futureHour <= 8)
+      ) {
+        diurnalFactor *= 1.10;
+      }
+
+      const projectedValue = Math.round(Math.max(15, Math.min(500, baseAqi * diurnalFactor)));
+      const projectedCategory = getAQICategory(projectedValue);
+
+      return {
+        ...loc,
+        latestAqi: {
+          ...loc.latestAqi,
+          value: projectedValue,
+          category: projectedCategory,
+          isProjected: true,
+          hourOffset: timeHorizon,
+        },
+      };
+    });
+  }, [filteredLocations, timeHorizon]);
+
+  const handleCitySelect = (city: SelectedCity) => {
+    setSelectedCity(city);
+
+    // Check if we have multiple ground stations in this city in our loaded station list
+    const cityStations = rawLocations.filter((loc) => {
+      const latDiff = Math.abs(loc.coordinates.latitude - city.latitude);
+      const lngDiff = Math.abs(loc.coordinates.longitude - city.longitude);
+      return latDiff < 0.25 && lngDiff < 0.25;
+    });
+
+    if (cityStations.length > 1) {
+      setViewportTargets(
+        cityStations.map((s) => [s.coordinates.latitude, s.coordinates.longitude])
+      );
+    } else {
+      setViewportTargets([[city.latitude, city.longitude]]);
+    }
+  };
+
+  const handleAutoPan = (coords: Array<[number, number]>) => {
+    if (coords && coords.length > 0) {
+      setViewportTargets(coords);
+    }
+  };
+
+  const handleSelectStation = (stationId: number) => {
+    setSelectedLocation(stationId);
     navigate('/');
   };
 
   return (
-    <>
-      {/* Interpolated concentration halo layer */}
-      {showHalo && aqi && (
-        <Circle
-          center={[location.coordinates.latitude, location.coordinates.longitude]}
-          radius={45000} // 45km radius
-          pathOptions={{
-            fillColor: color,
-            fillOpacity: 0.15,
-            stroke: false,
-          }}
-        />
-      )}
-
-      {/* Primary Station Vector Marker */}
-      <CircleMarker
-        center={[location.coordinates.latitude, location.coordinates.longitude]}
-        radius={aqi ? 10 : 7}
-        pathOptions={{
-          fillColor: color,
-          fillOpacity: 0.9,
-          color: '#ffffff',
-          weight: 2,
-        }}
-      >
-        <Popup>
-          <div className="min-w-[210px] space-y-2 text-sm p-1">
-            <div className="font-semibold text-gray-900">{location.name}</div>
-            {location.locality && (
-              <div className="text-gray-600 text-xs">{location.locality}</div>
-            )}
-
-            {aqi ? (
-              <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500 font-medium">BreatheBetter AQI</span>
-                  <span
-                    className="px-2 py-0.5 rounded text-xs font-bold text-white shadow-xs"
-                    style={{ backgroundColor: color }}
-                  >
-                    {aqi.value} · {aqi.category}
-                  </span>
-                </div>
-                {aqi.dominantPollutant && (
-                  <div className="text-[11px] text-gray-600 flex justify-between">
-                    <span>Dominant:</span>
-                    <strong className="uppercase font-semibold text-gray-900">{aqi.dominantPollutant}</strong>
-                  </div>
-                )}
-                <div className="text-[10px] text-gray-400 italic">
-                  Calculated using CPCB methodology
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-gray-400 italic">AQI unavailable — insufficient valid pollutant data</div>
-            )}
-
-            <div className="text-[11px] text-gray-400">
-              {location.coordinates.latitude.toFixed(4)}°N, {location.coordinates.longitude.toFixed(4)}°E
+    <div className="h-full flex flex-col relative overflow-hidden bg-background">
+      {/* Top Filter & Search Header */}
+      <div className="p-3.5 border-b border-border bg-card/95 backdrop-blur-md z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <MapPin className="w-4 h-4 text-primary" />
             </div>
-
-            <button
-              onClick={handleViewStation}
-              className="w-full mt-2 py-1.5 px-3 rounded text-xs font-medium bg-[#106644] text-white hover:bg-[#0d5337] transition-colors text-center block shadow-xs"
-            >
-              Open in Live Dashboard →
-            </button>
+            <div>
+              <h1 className="font-bold text-sm md:text-base leading-tight">Explore Air Quality Map</h1>
+              <p className="text-xs text-muted-foreground">
+                {isLoading
+                  ? 'Loading monitoring network...'
+                  : `${filteredLocations.length} stations visible across India`}
+              </p>
+            </div>
           </div>
-        </Popup>
-      </CircleMarker>
-    </>
-  );
-}
 
-export function MapPage() {
-  const { data, isLoading } = useLocations({ limit: 500, country: 'IN' });
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showHalo, setShowHalo] = useState(false);
-  const locations = data?.data ?? [];
-
-  const filteredLocations = selectedCategory
-    ? locations.filter((l) => l.latestAqi?.category === selectedCategory)
-    : locations;
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Map header */}
-      <div className="p-4 border-b border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-primary" />
-          <div>
-            <h1 className="font-semibold text-base">Interactive Air Quality Map</h1>
-            <p className="text-xs text-muted-foreground">
-              {isLoading
-                ? 'Loading monitoring stations...'
-                : `${filteredLocations.length} of ${locations.length} monitoring stations shown`}
-            </p>
-          </div>
+          {/* Mobile Filter Toggle */}
+          <button
+            onClick={() => setShowFilterDrawer(!showFilterDrawer)}
+            className="md:hidden p-2 rounded-lg border border-border text-foreground hover:bg-muted"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Controls: Halo layer toggle & Category filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowHalo(!showHalo)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-              showHalo
-                ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-                : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-            }`}
-            title="Toggle concentration dispersion visualization derived from station data"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Interpolated Density Layer</span>
-          </button>
+        {/* City Search Bar (Integrated) */}
+        <div className="w-full md:max-w-md">
+          <CitySearch onSelectCity={handleCitySelect} />
+        </div>
 
-          <div className="h-4 w-px bg-border hidden sm:block" />
-
+        {/* Desktop Quick Category Filters */}
+        <div className="hidden lg:flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
               selectedCategory === null
-                ? 'bg-primary text-primary-foreground border-primary font-medium'
+                ? 'bg-primary text-primary-foreground border-primary'
                 : 'border-border text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -185,14 +363,14 @@ export function MapPage() {
               <button
                 key={label}
                 onClick={() => setSelectedCategory(isSelected ? null : label)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition-colors ${
                   isSelected
-                    ? 'border-transparent text-white font-medium shadow-xs'
+                    ? 'border-transparent text-white font-bold shadow-xs'
                     : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
                 style={isSelected ? { backgroundColor: color } : {}}
               >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                 <span>{label}</span>
               </button>
             );
@@ -200,48 +378,270 @@ export function MapPage() {
         </div>
       </div>
 
-      {/* Map container */}
-      <div className="flex-1 relative">
+      {/* Secondary Controls Bar (Station Type, AQI Status, Halo) */}
+      <div className="px-4 py-2 border-b border-border/60 bg-muted/30 flex items-center justify-between gap-2 overflow-x-auto text-xs">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-muted-foreground font-medium flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" />
+            Type:
+          </span>
+          <div className="flex items-center gap-1 bg-background/80 p-0.5 rounded-lg border border-border">
+            {(
+              [
+                { id: 'all', label: 'All Stations' },
+                { id: 'reference', label: 'Reference Monitors' },
+                { id: 'sensors', label: 'Sensors Only' },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setMonitorFilter(t.id)}
+                className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                  monitorFilter === t.id
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground font-medium">Status:</span>
+            <div className="flex items-center gap-1 bg-background/80 p-0.5 rounded-lg border border-border">
+              {(
+                [
+                  { id: 'all', label: 'All' },
+                  { id: 'valid', label: 'Valid AQI' },
+                  { id: 'unavailable', label: 'Incomplete' },
+                ] as const
+              ).map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setAqiFilter(s.id)}
+                  className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                    aqiFilter === s.id
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowHalo(!showHalo)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium border transition-colors ${
+              showHalo
+                ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                : 'border-border text-muted-foreground hover:text-foreground bg-background/80'
+            }`}
+            title="Toggle concentration dispersion halos"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Density Halos</span>
+          </button>
+
+          <button
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium border transition-colors ${
+              showHeatmap
+                ? 'bg-rose-600 text-white border-rose-600 shadow-xs font-bold'
+                : 'border-border text-muted-foreground hover:text-foreground bg-background/80'
+            }`}
+            title="Toggle Continuous Regional Pollution Heatmap"
+          >
+            <span>🔥 Pollution Heatmap</span>
+          </button>
+
+          <button
+            onClick={() => setHighlightIndia(!highlightIndia)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium border transition-colors ${
+              highlightIndia
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-semibold'
+                : 'border-border text-muted-foreground hover:text-foreground bg-background/80'
+            }`}
+            title="Highlight India sovereign boundary and dim outer regions"
+          >
+            <span>🇮🇳 India Spotlight</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Interactive Map Canvas */}
+      <div ref={mapContainerRef} className="flex-1 relative bg-slate-100">
         <MapContainer
           center={INDIA_CENTER}
           zoom={5}
+          minZoom={4.5}
+          maxZoom={18}
+          maxBounds={INDIA_BOUNDS}
+          maxBoundsViscosity={0.85}
+          zoomControl={false}
           style={{ height: '100%', width: '100%' }}
           className="z-0"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          {tileLayerType === 'streets' ? (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          ) : (
+            <TileLayer
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={18}
+            />
+          )}
+
+          {/* India Sovereign Boundary & Dimming Mask */}
+          <IndiaBoundaryLayer highlight={highlightIndia} />
+
+          {/* Continuous Multi-Point Pollution Heatmap Surface */}
+          <HeatmapLayer locations={displayedLocations} visible={showHeatmap} />
+
+          {/* Marker Cluster Layer with CPCB AQI color pins */}
+          <ClusterMapLayer
+            locations={displayedLocations}
+            onSelectStation={handleSelectStation}
           />
 
-          {filteredLocations.map((loc) => (
-            <StationMarker key={loc.openaqId} location={loc} showHalo={showHalo} />
-          ))}
+          {/* Interpolated dispersion halo rings if enabled */}
+          {showHalo &&
+            displayedLocations.map((loc) => {
+              if (!loc.latestAqi) return null;
+              const color = getAQIColorHex(loc.latestAqi.category as AQICategory);
+              return (
+                <Circle
+                  key={`halo-${loc.openaqId}`}
+                  center={[loc.coordinates.latitude, loc.coordinates.longitude]}
+                  radius={40000}
+                  pathOptions={{
+                    fillColor: color,
+                    fillOpacity: 0.12,
+                    stroke: false,
+                  }}
+                />
+              );
+            })}
 
-          <LocateMe />
+          {viewportTargets && <MapViewportHandler targets={viewportTargets} />}
+
+          {/* Floating Geospatial Controls (Zoom, GPS, Reset, Satellite Toggle, Fullscreen) */}
+          <FloatingMapControls
+            mapContainerRef={mapContainerRef}
+            tileLayerType={tileLayerType}
+            onToggleTileLayer={() =>
+              setTileLayerType(tileLayerType === 'streets' ? 'satellite' : 'streets')
+            }
+          />
         </MapContainer>
 
+        {/* Floating Predicted AQI Horizon Slider & Radar Control Dock */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-1.5 w-auto max-w-[94vw] pointer-events-auto">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-card/95 backdrop-blur-md border border-border shadow-2xl">
+            {/* Play/Pause Button */}
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+                isPlaying
+                  ? 'bg-rose-600 text-white shadow-md animate-pulse'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs'
+              }`}
+              title={isPlaying ? 'Pause Radar Simulation' : 'Play 24-Hour Predictive Dispersion Radar'}
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            </button>
+
+            {/* Time Horizon Step Buttons */}
+            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+              {[
+                { offset: 0, label: 'Live' },
+                { offset: 3, label: '+3h' },
+                { offset: 6, label: '+6h' },
+                { offset: 12, label: '+12h' },
+                { offset: 18, label: '+18h' },
+                { offset: 24, label: '+24h' },
+              ].map((step) => {
+                const isActive = timeHorizon === step.offset;
+                return (
+                  <button
+                    key={step.offset}
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setTimeHorizon(step.offset);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      isActive
+                        ? step.offset === 0
+                          ? 'bg-emerald-600 text-white shadow-xs scale-105'
+                          : 'bg-indigo-600 text-white shadow-xs scale-105'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {step.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Time status feedback */}
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-background/80 rounded-xl border border-border/60 text-xs text-foreground font-medium">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              <span>
+                {timeHorizon === 0 ? (
+                  <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Ground Stations
+                  </span>
+                ) : (
+                  <span className="text-indigo-900 font-semibold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                    +{timeHorizon}h Diurnal Forecast Simulation
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* City Air Quality Intelligence Drawer */}
+        {selectedCity && (
+          <CityAirQualityPanel
+            city={selectedCity}
+            onClose={() => setSelectedCity(null)}
+            onSelectStation={handleSelectStation}
+            onAutoPan={handleAutoPan}
+          />
+        )}
+
+        {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 bg-background/50 backdrop-blur-xs flex items-center justify-center z-10">
-            <div className="p-4 rounded-xl bg-card border border-border shadow-lg text-sm text-foreground flex items-center gap-3">
-              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              Loading monitoring stations...
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-xs flex items-center justify-center z-[1200]">
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-2xl text-sm text-foreground flex items-center gap-3">
+              <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span>Loading India monitoring network & real-time observations...</span>
             </div>
           </div>
         )}
 
-        {/* Halo mode explanation banner */}
-        {showHalo && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-11/12 bg-card/95 backdrop-blur-md border border-border p-2.5 rounded-xl shadow-lg flex items-start gap-2 text-xs text-muted-foreground">
-            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p>
-              <strong>Spatial Interpolation Notice:</strong> Halo visualization reflects estimated dispersion derived from sparse ground stations. It is not an officially certified continuous surface.
-            </p>
+        {/* Map Legend & Methodology footnote */}
+        <div className="absolute bottom-3 left-3 z-[1000] text-[11px] text-muted-foreground bg-card/95 backdrop-blur-md border border-border px-3 py-2 rounded-xl shadow-md max-w-xs hidden sm:block">
+          <div className="font-semibold text-foreground mb-1">CPCB AQI Categories</div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[10px]">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#009966]" /> Good (0-50)</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#55aa00]" /> Satisfactory</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ffde33]" /> Moderate</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ff7e00]" /> Poor</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#cc0033]" /> Very Poor</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#7e0023]" /> Severe</span>
           </div>
-        )}
-
-        {/* Attribution bar */}
-        <div className="absolute bottom-2 left-2 z-[1000] text-[11px] text-muted-foreground bg-card/90 backdrop-blur-xs border border-border px-3 py-1.5 rounded-lg shadow-sm">
-          Ground data: OpenAQ · CPCB Methodology · Map: OpenStreetMap
         </div>
       </div>
     </div>

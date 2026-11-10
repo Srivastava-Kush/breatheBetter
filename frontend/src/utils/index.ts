@@ -19,6 +19,16 @@ export function getAQIColorHex(category: AQICategory | null | undefined): string
   return colors[category ?? 'Unknown'] ?? '#9ca3af';
 }
 
+export function getAQICategory(aqi: number | null | undefined): AQICategory {
+  if (aqi === null || aqi === undefined || isNaN(aqi)) return 'Unknown' as any;
+  if (aqi <= 50) return 'Good';
+  if (aqi <= 100) return 'Satisfactory';
+  if (aqi <= 200) return 'Moderate';
+  if (aqi <= 300) return 'Poor';
+  if (aqi <= 400) return 'Very Poor';
+  return 'Severe';
+}
+
 export function getAQICSSClass(category: AQICategory | null | undefined): string {
   const classes: Record<string, string> = {
     'Good': 'aqi-good',

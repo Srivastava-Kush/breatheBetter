@@ -1,8 +1,11 @@
-import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp, BellRing } from 'lucide-react';
-import { useDashboard, useHistory, useAlerts } from '../hooks/useAirQuality';
+import { useState } from 'react';
+import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp, BellRing, CloudSun, Droplets, Compass, Thermometer, BookOpen } from 'lucide-react';
+import { useDashboard, useHistory, useAlerts, useWeather } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { AQIGauge } from '../components/AQIGauge';
+import { AqiVisualFigure } from '../components/AqiVisualFigure';
 import { PollutantCard } from '../components/ui/PollutantCard';
+import { PollutantGuideModal } from '../components/PollutantGuideModal';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -77,10 +80,15 @@ export function OverviewPage() {
   const { selectedLocationId, recentLocations } = useAppStore();
   const locationId = selectedLocationId ?? DEFAULT_LOCATION_ID;
 
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guidePollutant, setGuidePollutant] = useState('pm25');
+
   const { data, isLoading, isError, refetch, isFetching } = useDashboard(locationId);
   const { data: alertsData } = useAlerts();
+  const { data: weatherRes } = useWeather(locationId);
 
   const dashboard = data?.data;
+  const weather = weatherRes?.data;
   const aqi = dashboard?.aqi;
   const health = dashboard?.health;
   const pollutants = dashboard?.pollutants ?? {};
@@ -196,6 +204,15 @@ export function OverviewPage() {
               size="lg"
             />
 
+            {/* Visual Meaning Figure & Human Activity Meaning */}
+            <div className="w-full pt-2 border-t border-border/60">
+              <AqiVisualFigure
+                category={aqi?.category}
+                size="md"
+                showDetails={true}
+              />
+            </div>
+
             {aqi && !aqi.isValid && (
               <div className="w-full p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
                 <AlertCircle className="w-4 h-4 inline mr-1" />
@@ -266,22 +283,108 @@ export function OverviewPage() {
       {/* AI Pollution Insights */}
       <InsightsCard locationId={locationId} />
 
+      {/* Multi-API Meteorological Dispersion Integration */}
+      {weather && (
+        <Card className="border-border shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CloudSun className="w-4 h-4 text-primary" />
+                Multi-API Meteorological & Atmospheric Ventilation Context
+              </CardTitle>
+              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                Open-Meteo Weather API
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                  <Thermometer className="w-3 h-3 text-amber-500" />
+                  Temperature
+                </div>
+                <div className="text-lg font-bold text-foreground mt-0.5">
+                  {weather.temperatureC}°C
+                </div>
+                <div className="text-[10px] text-muted-foreground">{weather.weatherDescription}</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                  <Wind className="w-3 h-3 text-primary" />
+                  Surface Wind
+                </div>
+                <div className="text-lg font-bold text-foreground mt-0.5">
+                  {weather.windSpeedKmh} <span className="text-xs font-normal text-muted-foreground">km/h</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">Heading {weather.windDirectionDeg}°</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                  <Droplets className="w-3 h-3 text-blue-500" />
+                  Relative Humidity
+                </div>
+                <div className="text-lg font-bold text-foreground mt-0.5">
+                  {weather.relativeHumidity}%
+                </div>
+                <div className="text-[10px] text-muted-foreground">Pressure {weather.surfacePressureHpa} hPa</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                  <Compass className="w-3 h-3 text-emerald-600" />
+                  Dispersion Rating
+                </div>
+                <div className="text-sm font-bold text-foreground capitalize mt-1">
+                  {weather.dispersionConditions}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Boundary ventilation</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-muted/30 border border-border/50 text-xs text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">Dispersion Analysis:</strong> {weather.dispersionExplanation}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pollutants */}
       <div>
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          Pollutant Readings
-          {Object.keys(pollutants).length === 0 && (
-            <span className="text-sm font-normal text-muted-foreground">
-              — No readings available
-            </span>
-          )}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            Pollutant Readings
+            {Object.keys(pollutants).length === 0 && (
+              <span className="text-sm font-normal text-muted-foreground">
+                — No readings available
+              </span>
+            )}
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setGuidePollutant('pm25');
+              setGuideOpen(true);
+            }}
+            className="text-xs shadow-xs"
+          >
+            <BookOpen className="w-3.5 h-3.5 mr-1.5 text-primary" />
+            Understand Pollutants
+          </Button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           {Object.entries(pollutants).map(([key, reading]) => (
             <PollutantCard
               key={key}
               pollutant={key}
               reading={reading as PollutantReading}
+              onOpenGuide={(p) => {
+                setGuidePollutant(p);
+                setGuideOpen(true);
+              }}
             />
           ))}
         </div>
@@ -332,6 +435,12 @@ export function OverviewPage() {
           </div>
         </div>
       )}
+      {/* Educational Pollutant Meaning Guide */}
+      <PollutantGuideModal
+        isOpen={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        initialPollutant={guidePollutant}
+      />
     </div>
   );
 }
