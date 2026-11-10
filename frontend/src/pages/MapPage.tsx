@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { CitySearch, SelectedCity } from '../components/CitySearch';
 import { CityAirQualityPanel } from '../components/CityAirQualityPanel';
-import { ClusterMapLayer } from '../components/ClusterMapLayer';
+import { StationMarkersLayer } from '../components/ClusterMapLayer';
 import { HeatmapLayer } from '../components/HeatmapLayer';
 import { IndiaBoundaryLayer } from '../components/IndiaBoundaryLayer';
 
@@ -506,8 +506,8 @@ export function MapPage() {
           {/* Continuous Multi-Point Pollution Heatmap Surface */}
           <HeatmapLayer locations={displayedLocations} visible={showHeatmap} />
 
-          {/* Marker Cluster Layer with CPCB AQI color pins */}
-          <ClusterMapLayer
+          {/* Individual Station Markers Layer with Real-Time CPCB AQI value pins (No clustering) */}
+          <StationMarkersLayer
             locations={displayedLocations}
             onSelectStation={handleSelectStation}
           />

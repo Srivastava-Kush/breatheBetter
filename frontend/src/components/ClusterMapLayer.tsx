@@ -1,66 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import type { Location, AQICategory } from '../types';
 import { getAQIColorHex } from '../utils';
 
-interface ClusterMapLayerProps {
+interface StationMarkersLayerProps {
   locations: Location[];
   onSelectStation: (locationId: number) => void;
 }
 
-export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerProps) {
+/**
+ * StationMarkersLayer (Individual Stations Mode)
+ * Renders every regulatory ground station as an individual high-visibility tactile AQI badge.
+ * Eliminates clustering so users can see real-time numeric AQI values across all cities simultaneously.
+ */
+export function StationMarkersLayer({ locations, onSelectStation }: StationMarkersLayerProps) {
   const map = useMap();
-  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!map) return;
 
-    // Create marker cluster group
-    const clusterGroup = L.markerClusterGroup({
-      chunkedLoading: true,
-      maxClusterRadius: 45,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      iconCreateFunction: (cluster) => {
-        const markers = cluster.getAllChildMarkers();
-        const count = markers.length;
-
-        // Calculate average / most severe color in cluster for subtle visual accent
-        let sizeClass = 'small';
-        if (count > 20) sizeClass = 'large';
-        else if (count > 8) sizeClass = 'medium';
-
-        return L.divIcon({
-          html: `<div class="bb-cluster-inner"><span>${count}</span></div>`,
-          className: `marker-cluster marker-cluster-${sizeClass} bb-custom-cluster`,
-          iconSize: L.point(42, 42),
-        });
-      },
-    });
-
-    clusterGroupRef.current = clusterGroup;
-    map.addLayer(clusterGroup);
+    // Create a plain LayerGroup for all individual stations (No clustering)
+    const layerGroup = L.layerGroup();
+    layerGroupRef.current = layerGroup;
+    map.addLayer(layerGroup);
 
     return () => {
-      if (clusterGroupRef.current) {
-        map.removeLayer(clusterGroupRef.current);
-        clusterGroupRef.current.clearLayers();
-        clusterGroupRef.current = null;
+      if (layerGroupRef.current) {
+        map.removeLayer(layerGroupRef.current);
+        layerGroupRef.current.clearLayers();
+        layerGroupRef.current = null;
       }
     };
   }, [map]);
 
-  // Update markers when locations change
+  // Update markers when locations or projected values change
   useEffect(() => {
-    const clusterGroup = clusterGroupRef.current;
-    if (!clusterGroup) return;
+    const layerGroup = layerGroupRef.current;
+    if (!layerGroup) return;
 
-    clusterGroup.clearLayers();
+    layerGroup.clearLayers();
 
     locations.forEach((loc) => {
       const { latitude, longitude } = loc.coordinates;
@@ -71,10 +51,10 @@ export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerP
         ? getAQIColorHex(aqi.category as AQICategory)
         : '#9ca3af';
 
-      const aqiVal = aqi?.value ? `${aqi.value}` : '—';
+      const aqiVal = aqi?.value !== undefined && aqi?.value !== null ? `${aqi.value}` : '—';
       const textColor = aqi?.category === 'Moderate' ? '#111827' : '#ffffff';
 
-      // Tactile CPCB AQI Badge Marker with increased size and visible real-time score
+      // Tactile CPCB AQI Badge Marker: visible numeric score, color-coded, with downward pointer tip
       const stationIcon = L.divIcon({
         className: 'bb-station-marker-container',
         html: `
@@ -84,7 +64,7 @@ export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerP
             border: 2px solid #ffffff;
             border-radius: 9999px;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-            min-width: 42px;
+            min-width: 44px;
             height: 28px;
             padding: 0 7px;
             display: flex;
@@ -96,6 +76,7 @@ export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerP
             cursor: pointer;
             position: relative;
             user-select: none;
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease-out;
           ">
             <span>${aqiVal}</span>
             <div style="
@@ -118,13 +99,22 @@ export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerP
 
       const marker = L.marker([latitude, longitude], {
         icon: stationIcon,
+        riseOnHover: true,
+      });
+
+      // Hover elevation: bring hovered marker above nearby overlapping pins in dense metros
+      marker.on('mouseover', () => {
+        marker.setZIndexOffset(10000);
+      });
+      marker.on('mouseout', () => {
+        marker.setZIndexOffset(0);
       });
 
       const isProjected = (aqi as any)?.isProjected;
       const hourOffset = (aqi as any)?.hourOffset;
 
       const popupContent = document.createElement('div');
-      popupContent.className = 'bb-station-popup space-y-2 text-sm p-1 min-w-[210px]';
+      popupContent.className = 'bb-station-popup space-y-2 text-sm p-1 min-w-[220px]';
       popupContent.innerHTML = `
         <div class="flex items-start justify-between gap-2">
           <div class="font-semibold text-gray-900 leading-tight">${loc.name}</div>
@@ -165,18 +155,20 @@ export function ClusterMapLayer({ locations, onSelectStation }: ClusterMapLayerP
 
       const actionBtn = document.createElement('button');
       actionBtn.className =
-        'w-full mt-2 py-1.5 px-3 rounded text-xs font-medium bg-[#106644] text-white hover:bg-[#0d5337] transition-colors text-center block shadow-xs';
+        'w-full mt-2 py-1.5 px-3 rounded text-xs font-medium bg-[#106644] text-white hover:bg-[#0d5337] transition-colors text-center block shadow-xs cursor-pointer';
       actionBtn.textContent = 'Open Station Analytics →';
       actionBtn.onclick = () => {
         onSelectStation(loc.openaqId);
       };
       popupContent.appendChild(actionBtn);
 
-      marker.bindPopup(popupContent, { maxWidth: 260 });
-      clusterGroup.addLayer(marker);
+      marker.bindPopup(popupContent, { maxWidth: 280 });
+      layerGroup.addLayer(marker);
     });
   }, [locations, onSelectStation]);
 
   return null;
 }
 
+// Backward-compatible export
+export const ClusterMapLayer = StationMarkersLayer;
