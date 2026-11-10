@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import { POLLUTANT_DISPLAY } from '../types';
 import { PollutantGuideModal } from '../components/PollutantGuideModal';
+import { DiurnalHeatmap } from '../components/DiurnalHeatmap';
 import { useNavigate } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -166,6 +167,12 @@ export function AnalyticsPage() {
   const { selectedLocationId } = useAppStore();
   const navigate = useNavigate();
 
+  const { data: allHistoryRes, isLoading: allHistoryLoading } = useHistory(
+    selectedLocationId,
+    hours
+  );
+  const allObservations = (allHistoryRes?.data as any[]) ?? [];
+
   const { data: anomaliesRes, isLoading: anomaliesLoading } = useAnomalies(
     selectedLocationId,
     hours,
@@ -312,27 +319,55 @@ export function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Pollutant selector */}
-      <div className="flex flex-wrap gap-2">
-        {POLLUTANTS.map((p) => {
-          const display = POLLUTANT_DISPLAY[p];
-          const active = activePollutants.includes(p);
-          return (
-            <button
-              key={p}
-              onClick={() => togglePollutant(p)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                active
-                  ? 'border-transparent text-white shadow-xs'
-                  : 'border-border text-muted-foreground hover:text-foreground bg-card'
-              }`}
-              style={active ? { backgroundColor: CHART_COLORS[p] } : {}}
-            >
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[p] }} />
-              {display?.label ?? p.toUpperCase()}
-            </button>
-          );
-        })}
+      {/* Multi-Pollutant Aggregated 24-Hour Diurnal Heatmap Matrix */}
+      <DiurnalHeatmap
+        observations={allObservations}
+        hoursWindow={hours}
+        isLoading={allHistoryLoading}
+        onOpenGuide={(pol) => {
+          setGuidePollutant(pol);
+          setGuideOpen(true);
+        }}
+      />
+
+      {/* Individual Pollutants Section Header & Selector */}
+      <div className="pt-2 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-foreground">
+              Individual Pollutant Trend Curves & Detailed Telemetry
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Select up to 4 specific pollutants to view separate high-resolution statistical dispersion curves
+            </p>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono">
+            Active: {activePollutants.map((p) => p.toUpperCase()).join(', ')}
+          </span>
+        </div>
+
+        {/* Pollutant selector */}
+        <div className="flex flex-wrap gap-2">
+          {POLLUTANTS.map((p) => {
+            const display = POLLUTANT_DISPLAY[p];
+            const active = activePollutants.includes(p);
+            return (
+              <button
+                key={p}
+                onClick={() => togglePollutant(p)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  active
+                    ? 'border-transparent text-white shadow-xs'
+                    : 'border-border text-muted-foreground hover:text-foreground bg-card'
+                }`}
+                style={active ? { backgroundColor: CHART_COLORS[p] } : {}}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[p] }} />
+                {display?.label ?? p.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Charts Grid */}
