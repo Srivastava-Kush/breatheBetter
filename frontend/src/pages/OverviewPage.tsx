@@ -1,9 +1,28 @@
 import { useState } from 'react';
-import { Wind, AlertCircle, RefreshCw, MapPin, Clock, TrendingUp, BellRing, CloudSun, Droplets, Compass, Thermometer, BookOpen } from 'lucide-react';
+import {
+  Wind,
+  AlertCircle,
+  RefreshCw,
+  MapPin,
+  Clock,
+  TrendingUp,
+  BellRing,
+  CloudSun,
+  Droplets,
+  Compass,
+  Thermometer,
+  BookOpen,
+  Sparkles,
+  ShieldCheck,
+  Heart,
+  Activity,
+  Smile,
+  AlertTriangle,
+} from 'lucide-react';
 import { useDashboard, useHistory, useAlerts, useWeather } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { AQIGauge } from '../components/AQIGauge';
-import { AqiVisualFigure } from '../components/AqiVisualFigure';
+import { AqiVisualFigure, getAqiFigureDetails } from '../components/AqiVisualFigure';
 import { PollutantCard } from '../components/ui/PollutantCard';
 import { PollutantGuideModal } from '../components/PollutantGuideModal';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -11,12 +30,12 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AQIShareCard } from '../components/AQIShareCard';
 import { InsightsCard } from '../components/InsightsCard';
-import { formatDateTime } from '../utils';
-import type { PollutantReading } from '../types';
+import { formatDateTime, getAQIColorHex } from '../utils';
+import type { PollutantReading, AQICategory } from '../types';
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -25,53 +44,125 @@ import {
 
 const DEFAULT_LOCATION_ID = 4663956; // Santushti Apartments, Vasant Kunj — fallback for demo
 
-function HistoryChart({ locationId }: { locationId: number }) {
+function getCategoryAtmosphereStyle(category: string | undefined) {
+  switch (category) {
+    case 'Good':
+      return {
+        cardBg: 'bg-gradient-to-br from-emerald-500/[0.08] via-card to-emerald-500/[0.02]',
+        borderColor: 'border-emerald-300/70',
+        glowBg: 'rgba(0, 153, 102, 0.15)',
+        accentTag: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      };
+    case 'Satisfactory':
+      return {
+        cardBg: 'bg-gradient-to-br from-lime-500/[0.08] via-card to-lime-500/[0.02]',
+        borderColor: 'border-lime-300/70',
+        glowBg: 'rgba(85, 170, 0, 0.15)',
+        accentTag: 'bg-lime-100 text-lime-800 border-lime-200',
+      };
+    case 'Moderate':
+      return {
+        cardBg: 'bg-gradient-to-br from-amber-500/[0.09] via-card to-amber-500/[0.02]',
+        borderColor: 'border-amber-300/70',
+        glowBg: 'rgba(255, 222, 51, 0.15)',
+        accentTag: 'bg-amber-100 text-amber-800 border-amber-200',
+      };
+    case 'Poor':
+      return {
+        cardBg: 'bg-gradient-to-br from-orange-500/[0.09] via-card to-orange-500/[0.02]',
+        borderColor: 'border-orange-300/70',
+        glowBg: 'rgba(255, 126, 0, 0.15)',
+        accentTag: 'bg-orange-100 text-orange-800 border-orange-200',
+      };
+    case 'Very Poor':
+      return {
+        cardBg: 'bg-gradient-to-br from-rose-500/[0.09] via-card to-rose-500/[0.02]',
+        borderColor: 'border-rose-300/70',
+        glowBg: 'rgba(204, 0, 51, 0.15)',
+        accentTag: 'bg-rose-100 text-rose-800 border-rose-200',
+      };
+    case 'Severe':
+      return {
+        cardBg: 'bg-gradient-to-br from-purple-950/[0.12] via-card to-rose-950/[0.05]',
+        borderColor: 'border-purple-300/80',
+        glowBg: 'rgba(126, 0, 35, 0.2)',
+        accentTag: 'bg-purple-100 text-purple-900 border-purple-200',
+      };
+    default:
+      return {
+        cardBg: 'bg-card',
+        borderColor: 'border-border',
+        glowBg: 'rgba(156, 163, 175, 0.1)',
+        accentTag: 'bg-muted text-muted-foreground',
+      };
+  }
+}
+
+function HistoryAreaChart({ locationId }: { locationId: number }) {
   const { data, isLoading } = useHistory(locationId, 24, 'pm25');
 
-  if (isLoading) return <div className="h-48 bg-muted/30 rounded animate-pulse" />;
+  if (isLoading) return <div className="h-44 bg-muted/30 rounded-xl animate-pulse" />;
 
-  const points = data?.data?.map((d) => ({
-    time: new Date(d.measurementUtc).toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Kolkata',
-    }),
-    value: d.value,
-  })) ?? [];
+  const points =
+    data?.data?.map((d) => ({
+      time: new Date(d.measurementUtc).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Kolkata',
+      }),
+      value: d.value,
+    })) ?? [];
 
   if (points.length === 0) {
     return (
-      <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-        No historical data available yet
+      <div className="h-44 flex items-center justify-center text-muted-foreground text-xs italic">
+        No 24-hour historical records available for this station yet
       </div>
     );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <LineChart data={points} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-        <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
+    <ResponsiveContainer width="100%" height={190}>
+      <AreaChart data={points} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+        <defs>
+          <linearGradient id="pm25Gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#106644" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#106644" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+        <XAxis
+          dataKey="time"
+          tick={{ fontSize: 10, fill: '#64748b' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 10, fill: '#64748b' }}
+          axisLine={false}
+          tickLine={false}
+          unit=" µg"
+        />
         <Tooltip
           contentStyle={{
-            backgroundColor: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: 8,
+            backgroundColor: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 12,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
             fontSize: 12,
           }}
         />
-        <Line
+        <Area
           type="monotone"
           dataKey="value"
           name="PM2.5 (µg/m³)"
-          stroke="#009966"
-          strokeWidth={2}
-          dot={false}
+          stroke="#106644"
+          strokeWidth={2.5}
+          fill="url(#pm25Gradient)"
           connectNulls={false}
         />
-      </LineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
@@ -98,20 +189,24 @@ export function OverviewPage() {
     (a: any) =>
       a.locationId === locationId &&
       a.isActive &&
+      aqi?.value !== null &&
       aqi?.value !== undefined &&
-      aqi.value !== null &&
-      aqi.value >= a.aqiThreshold
+      aqi.value >= a.threshold
   );
+
+  const atmosphereStyle = getCategoryAtmosphereStyle(aqi?.category ?? undefined);
+  const aqiColor = getAQIColorHex(aqi?.category as AQICategory);
+  const figureDetails = getAqiFigureDetails(aqi?.category);
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-64 bg-muted rounded" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="h-64 bg-muted rounded-xl" />
-            <div className="lg:col-span-2 h-64 bg-muted rounded-xl" />
-          </div>
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        <div className="h-14 bg-muted/40 rounded-2xl animate-pulse" />
+        <div className="h-80 bg-muted/30 rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-32 bg-muted/20 rounded-2xl animate-pulse" />
+          ))}
         </div>
       </div>
     );
@@ -119,249 +214,319 @@ export function OverviewPage() {
 
   if (isError) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center gap-4 min-h-64">
-        <AlertCircle className="w-12 h-12 text-muted-foreground" />
-        <div className="text-center">
-          <h3 className="font-semibold">Unable to load dashboard</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            The backend may be starting up or the location is not yet synced.
-          </p>
-        </div>
+      <div className="p-8 max-w-2xl mx-auto my-12 text-center space-y-4 rounded-3xl border border-destructive/20 bg-destructive/5">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+        <h2 className="text-xl font-bold text-foreground">Station Telemetry Unavailable</h2>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Could not retrieve physical readings for this monitoring location. Please pick an alternative station using the search bar above.
+        </p>
         <Button onClick={() => refetch()} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4" /> Try again
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry Sync
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-6xl mx-auto">
       {/* Active Threshold Alert Banner */}
       {activeAlerts.length > 0 && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 text-rose-700 dark:text-rose-400">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-center justify-between gap-4 shadow-sm animate-in fade-in duration-200">
           <div className="flex items-center gap-3">
-            <BellRing className="w-5 h-5 shrink-0 animate-bounce" />
+            <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <BellRing className="w-5 h-5 animate-bounce" />
+            </div>
             <div>
-              <div className="font-semibold text-sm">Smart Threshold Alert Triggered!</div>
-              <div className="text-xs opacity-90">
-                AQI at {location?.name} ({aqi?.value}) has exceeded your configured alert threshold of {activeAlerts[0].aqiThreshold}.
+              <div className="font-extrabold text-sm">Active Air Quality Alert Exceeded!</div>
+              <div className="text-xs text-rose-800">
+                Current AQI <strong>{aqi?.value}</strong> exceeds your configured threshold of{' '}
+                <strong>{activeAlerts[0].threshold}</strong>.
               </div>
             </div>
           </div>
-          <span className="text-xs font-bold uppercase px-2.5 py-1 rounded bg-rose-500 text-white">
-            Threshold Exceeded
+          <span className="text-[11px] font-bold uppercase px-3 py-1 rounded-full bg-rose-600 text-white shadow-xs">
+            Critical Threshold
           </span>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-            <MapPin className="w-4 h-4" />
-            <span>{location?.name ?? 'Select a location'}</span>
-            {location?.locality && <span>· {location.locality}</span>}
-          </div>
-          <h1 className="text-2xl font-bold">Air Quality Overview</h1>
-          <p className="text-muted-foreground text-sm">
-            {new Date().toLocaleDateString('en-IN', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              timeZone: 'Asia/Kolkata',
-            })}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {dashboard && <AQIShareCard dashboard={dashboard} />}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      {/* Atmospheric Hero Command Showcase */}
+      <div
+        className={`p-6 sm:p-7 rounded-3xl border ${atmosphereStyle.borderColor} ${atmosphereStyle.cardBg} shadow-sm card-hover-lift relative overflow-hidden transition-all duration-300`}
+      >
+        {/* Ambient Top Glow Orbs */}
+        <div
+          className="absolute -top-24 -left-24 w-72 h-72 rounded-full pointer-events-none filter blur-3xl opacity-40 ambient-pulse"
+          style={{ backgroundColor: atmosphereStyle.glowBg }}
+        />
+        <div
+          className="absolute -bottom-24 -right-24 w-72 h-72 rounded-full pointer-events-none filter blur-3xl opacity-30 ambient-pulse"
+          style={{ backgroundColor: atmosphereStyle.glowBg }}
+        />
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* AQI Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wind className="w-5 h-5 text-primary" />
-              Air Quality Index
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
+        {/* Hero Top Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60 relative z-10">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <MapPin className="w-3.5 h-3.5 text-primary" />
+              <span>{location?.name ?? 'Select Station'}</span>
+              {location?.locality && (
+                <span className="text-primary font-bold">· {location.locality}</span>
+              )}
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+              Real-Time Air Quality Showcase
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {new Date().toLocaleDateString('en-IN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'Asia/Kolkata',
+              })}{' '}
+              · Indian Standard Time (IST)
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            {dashboard && <AQIShareCard dashboard={dashboard} />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="shadow-2xs rounded-xl"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
+              Sync Data
+            </Button>
+          </div>
+        </div>
+
+        {/* 3-Pillar Atmosphere Centerpiece */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 relative z-10 items-center">
+          {/* Pillar 1: Animated CPCB AQI Dial */}
+          <div className="lg:col-span-4 flex flex-col items-center justify-center p-5 rounded-2xl bg-card/90 border border-border/80 shadow-xs text-center space-y-3">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Wind className="w-4 h-4 text-primary" />
+              <span>CPCB National AQI</span>
+            </div>
+
             <AQIGauge
               aqi={aqi?.value ?? null}
               category={aqi?.category ?? 'Unknown'}
               size="lg"
             />
 
-            {/* Visual Meaning Figure & Human Activity Meaning */}
-            <div className="w-full pt-2 border-t border-border/60">
-              <AqiVisualFigure
-                category={aqi?.category}
-                size="md"
-                showDetails={true}
-              />
-            </div>
-
-            {aqi && !aqi.isValid && (
-              <div className="w-full p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-                <AlertCircle className="w-4 h-4 inline mr-1" />
-                {aqi.invalidReason ?? 'AQI unavailable'}
-              </div>
-            )}
-
-            {aqi?.isValid && aqi.dominantPollutant && (
-              <div className="text-center space-y-1">
-                <div className="text-xs text-muted-foreground">Dominant pollutant</div>
-                <Badge variant="default">{aqi.dominantPollutant.toUpperCase()}</Badge>
-              </div>
-            )}
-
-            <div className="text-xs text-center text-muted-foreground px-2">
-              {aqi?.displayLabel ?? 'No AQI data available'}
-            </div>
-
-            {aqi?.calculatedAt && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                Calculated {formatDateTime(aqi.calculatedAt)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Health Recommendation */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>{health?.emoji}</span>
-              Health Recommendations
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {health ? (
-              <>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {health.general}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { label: '🏃 Outdoor Activity', text: health.outdoor },
-                    { label: '⚠️ Sensitive Groups', text: health.sensitiveGroups },
-                    { label: '🤸 Exercise', text: health.exercise },
-                    { label: '😷 Masks', text: health.masks },
-                  ].map(({ label, text }) => (
-                    <div key={label} className="p-3 rounded-lg bg-muted/30 space-y-1">
-                      <div className="text-xs font-semibold">{label}</div>
-                      <div className="text-xs text-muted-foreground">{text}</div>
-                    </div>
-                  ))}
+            <div className="space-y-1 w-full pt-1">
+              {aqi?.isValid && aqi.dominantPollutant && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted border border-border text-xs font-bold text-foreground">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: aqiColor }} />
+                  <span>Dominant: {aqi.dominantPollutant.toUpperCase()}</span>
                 </div>
-                <p className="text-xs text-muted-foreground italic">
-                  Disclaimer: Health recommendations are general information only. Consult a healthcare professional for personal advice.
-                </p>
-              </>
+              )}
+              <div className="text-[11px] text-muted-foreground pt-1">
+                {aqi?.displayLabel ?? 'CPCB Piecewise Methodology'}
+              </div>
+              {aqi?.calculatedAt && (
+                <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground/80 font-mono">
+                  <Clock className="w-3 h-3" />
+                  Calculated {formatDateTime(aqi.calculatedAt)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pillar 2: Official Character Illustration & Real-World Meaning */}
+          <div className="lg:col-span-4 flex flex-col items-center justify-center p-5 rounded-2xl bg-card/90 border border-border/80 shadow-xs text-center space-y-3">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span>Real-World Atmosphere</span>
+            </div>
+
+            <AqiVisualFigure
+              category={aqi?.category}
+              size="md"
+              showDetails={true}
+            />
+          </div>
+
+          {/* Pillar 3: Multi-API Meteorological Dispersion Chips */}
+          <div className="lg:col-span-4 flex flex-col justify-between p-5 rounded-2xl bg-card/90 border border-border/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <CloudSun className="w-4 h-4 text-primary" />
+                <span>Weather & Ventilation</span>
+              </div>
+              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                Open-Meteo
+              </span>
+            </div>
+
+            {weather ? (
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 space-y-0.5">
+                  <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                    <Thermometer className="w-3 h-3 text-amber-500" />
+                    <span>Temperature</span>
+                  </div>
+                  <div className="text-base font-extrabold text-foreground">
+                    {weather.temperatureC}°C
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {weather.weatherDescription}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 space-y-0.5">
+                  <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                    <Wind className="w-3 h-3 text-primary" />
+                    <span>Surface Wind</span>
+                  </div>
+                  <div className="text-base font-extrabold text-foreground">
+                    {weather.windSpeedKmh} <span className="text-[10px] font-normal">km/h</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Heading {weather.windDirectionDeg}°
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 space-y-0.5">
+                  <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                    <Droplets className="w-3 h-3 text-blue-500" />
+                    <span>Humidity</span>
+                  </div>
+                  <div className="text-base font-extrabold text-foreground">
+                    {weather.relativeHumidity}%
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {weather.surfacePressureHpa} hPa
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 space-y-0.5">
+                  <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                    <Compass className="w-3 h-3 text-emerald-600" />
+                    <span>Dispersion</span>
+                  </div>
+                  <div className="text-sm font-extrabold capitalize text-foreground truncate">
+                    {weather.dispersionConditions}
+                  </div>
+                  <div className="text-[10px] text-emerald-700 font-medium">Ventilation</div>
+                </div>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Health data unavailable. Select a location to see recommendations.
-              </p>
+              <div className="p-4 text-center text-xs text-muted-foreground italic">
+                Synchronizing meteorological dispersion telemetry...
+              </div>
             )}
-          </CardContent>
-        </Card>
+
+            {weather && (
+              <div className="p-2.5 rounded-xl bg-muted/30 border border-border/60 text-[11px] text-muted-foreground leading-snug">
+                <strong className="text-foreground">Dispersion:</strong>{' '}
+                {weather.dispersionExplanation}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* AI Pollution Insights */}
+      {/* Health Action Protocols Section */}
+      <Card className="border-border shadow-xs">
+        <CardHeader className="pb-3 border-b border-border/60">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-extrabold flex items-center gap-2">
+              <Heart className="w-5 h-5 text-rose-500" />
+              <span>Medical & Health Precautions Protocol</span>
+            </CardTitle>
+            <span
+              className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-2xs"
+              style={{ backgroundColor: aqiColor }}
+            >
+              {aqi?.category ?? 'Advisory'}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4">
+          {health ? (
+            <>
+              <p className="text-xs sm:text-sm text-foreground/90 font-medium leading-relaxed bg-muted/30 p-3.5 rounded-xl border border-border/60">
+                {health.general}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  {
+                    icon: '🏃',
+                    label: 'Outdoor Exercise',
+                    text: health.exercise,
+                    border: 'border-l-emerald-500',
+                  },
+                  {
+                    icon: '👶',
+                    label: 'Sensitive Groups',
+                    text: health.sensitiveGroups,
+                    border: 'border-l-amber-500',
+                  },
+                  {
+                    icon: '🚶',
+                    label: 'Outdoor Walks',
+                    text: health.outdoor,
+                    border: 'border-l-sky-500',
+                  },
+                  {
+                    icon: '😷',
+                    label: 'Mask & Filtration',
+                    text: health.masks,
+                    border: 'border-l-rose-500',
+                  },
+                ].map(({ icon, label, text, border }) => (
+                  <div
+                    key={label}
+                    className={`p-3.5 rounded-xl bg-card border border-border/80 border-l-4 ${border} shadow-2xs space-y-1.5`}
+                  >
+                    <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                      <span className="text-base">{icon}</span>
+                      <span>{label}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground leading-relaxed">
+                      {text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-muted-foreground italic pt-1">
+                Disclaimer: Automated guidance based on official CPCB health advisories. Sensitive individuals should follow physician guidance.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Health guidance currently synchronizing.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Intelligence Card */}
       <InsightsCard locationId={locationId} />
 
-      {/* Multi-API Meteorological Dispersion Integration */}
-      {weather && (
-        <Card className="border-border shadow-xs">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <CloudSun className="w-4 h-4 text-primary" />
-                Multi-API Meteorological & Atmospheric Ventilation Context
-              </CardTitle>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                Open-Meteo Weather API
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
-                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                  <Thermometer className="w-3 h-3 text-amber-500" />
-                  Temperature
-                </div>
-                <div className="text-lg font-bold text-foreground mt-0.5">
-                  {weather.temperatureC}°C
-                </div>
-                <div className="text-[10px] text-muted-foreground">{weather.weatherDescription}</div>
-              </div>
+      {/* Key Pollutants Telemetry Section */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-extrabold flex items-center gap-2 text-foreground">
+              <Activity className="w-5 h-5 text-primary" />
+              <span>Live Pollutant Concentrations & Sub-Indices</span>
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Physical particulate and gaseous readings recorded by on-site optical spectrometers
+            </p>
+          </div>
 
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
-                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                  <Wind className="w-3 h-3 text-primary" />
-                  Surface Wind
-                </div>
-                <div className="text-lg font-bold text-foreground mt-0.5">
-                  {weather.windSpeedKmh} <span className="text-xs font-normal text-muted-foreground">km/h</span>
-                </div>
-                <div className="text-[10px] text-muted-foreground">Heading {weather.windDirectionDeg}°</div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
-                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                  <Droplets className="w-3 h-3 text-blue-500" />
-                  Relative Humidity
-                </div>
-                <div className="text-lg font-bold text-foreground mt-0.5">
-                  {weather.relativeHumidity}%
-                </div>
-                <div className="text-[10px] text-muted-foreground">Pressure {weather.surfacePressureHpa} hPa</div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-muted/40 border border-border">
-                <div className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                  <Compass className="w-3 h-3 text-emerald-600" />
-                  Dispersion Rating
-                </div>
-                <div className="text-sm font-bold text-foreground capitalize mt-1">
-                  {weather.dispersionConditions}
-                </div>
-                <div className="text-[10px] text-muted-foreground">Boundary ventilation</div>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-muted/30 border border-border/50 text-xs text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">Dispersion Analysis:</strong> {weather.dispersionExplanation}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pollutants */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            Pollutant Readings
-            {Object.keys(pollutants).length === 0 && (
-              <span className="text-sm font-normal text-muted-foreground">
-                — No readings available
-              </span>
-            )}
-          </h2>
           <Button
             variant="outline"
             size="sm"
@@ -369,13 +534,14 @@ export function OverviewPage() {
               setGuidePollutant('pm25');
               setGuideOpen(true);
             }}
-            className="text-xs shadow-xs"
+            className="text-xs shadow-xs rounded-xl"
           >
             <BookOpen className="w-3.5 h-3.5 mr-1.5 text-primary" />
             Understand Pollutants
           </Button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {Object.entries(pollutants).map(([key, reading]) => (
             <PollutantCard
               key={key}
@@ -388,54 +554,61 @@ export function OverviewPage() {
             />
           ))}
         </div>
+
         {Object.keys(pollutants).length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <Wind className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No pollutant measurements available for this location.</p>
-            <p className="text-sm mt-1">
-              Data will appear after the first sync completes.
-            </p>
+          <div className="text-center py-10 text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border">
+            <Wind className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-semibold">No active pollutant telemetry reported</p>
+            <p className="text-xs mt-0.5">Sensor synchronization in progress</p>
           </div>
         )}
       </div>
 
-      {/* 24h PM2.5 Trend */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            PM2.5 — Last 24 Hours
-          </CardTitle>
+      {/* 24-Hour PM2.5 Micro-Trend Chart Card */}
+      <Card className="border-border shadow-xs">
+        <CardHeader className="pb-2 border-b border-border/60">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span>24-Hour PM2.5 Atmospheric Concentration Profile</span>
+            </CardTitle>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              NAAQS Safe 24h Limit: 60 µg/m³
+            </span>
+          </div>
         </CardHeader>
-        <CardContent>
-          <HistoryChart locationId={locationId} />
-          <p className="text-xs text-muted-foreground mt-2">
-            Hourly average measurements from OpenAQ ground sensors.
-            Gaps indicate missing or unavailable data for that period.
+        <CardContent className="p-4 space-y-2">
+          <HistoryAreaChart locationId={locationId} />
+          <p className="text-[11px] text-muted-foreground">
+            Continuous hourly average readings recorded by regulatory monitors. Missing points reflect active calibration cycles.
           </p>
         </CardContent>
       </Card>
 
-      {/* Recently viewed */}
+      {/* Recently Viewed Stations */}
       {recentLocations.length > 0 && (
-        <div>
-          <h2 className="text-base font-semibold mb-3 text-muted-foreground">Recent Locations</h2>
+        <div className="pt-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Recently Inspected Stations
+            </h3>
+          </div>
           <div className="flex flex-wrap gap-2">
             {recentLocations.slice(0, 6).map((loc) => (
               <button
                 key={loc.openaqId}
                 onClick={() => useAppStore.getState().setSelectedLocation(loc.openaqId)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border
-                           text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-all shadow-2xs hover:scale-102"
               >
-                <MapPin className="w-3 h-3" />
-                {loc.name.split(',')[0]}
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                <span>{loc.name.split(',')[0]}</span>
               </button>
             ))}
           </div>
         </div>
       )}
-      {/* Educational Pollutant Meaning Guide */}
+
+      {/* Educational Pollutant Meaning Guide Modal */}
       <PollutantGuideModal
         isOpen={guideOpen}
         onClose={() => setGuideOpen(false)}
@@ -444,4 +617,3 @@ export function OverviewPage() {
     </div>
   );
 }
-
