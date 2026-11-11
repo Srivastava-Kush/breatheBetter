@@ -91,22 +91,18 @@ export function CityAirQualityPanel({
   const handleOpenStation = (stationId: number) => {
     setNavigatingStationId(stationId);
     setSelectedLocation(stationId);
-    // Smooth micro-timeout to display immediate interactive loading feedback before route transition
-    setTimeout(() => {
-      if (onSelectStation) {
-        onSelectStation(stationId);
-      } else {
-        navigate('/analytics');
-      }
-    }, 220);
+    onClose();
+    if (onSelectStation) {
+      onSelectStation(stationId);
+    } else {
+      navigate('/');
+    }
   };
 
   const handlePanToStation = (stationId: number, lat: number, lng: number) => {
     setLocalFocusedId(stationId);
-    // On small screens, collapse the panel so the user can immediately see the focused marker
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setIsCollapsed(true);
-    }
+    // Automatically minimize into the compact floating pill so the focused station, sonar waves, and map are 100% visible
+    setIsCollapsed(true);
     if (onFocusStation) {
       onFocusStation(stationId, lat, lng);
     } else if (onAutoPan) {
@@ -403,11 +399,11 @@ export function CityAirQualityPanel({
                           {navigatingStationId === st.id ? (
                             <>
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              <span>Loading...</span>
+                              <span>Opening...</span>
                             </>
                           ) : (
                             <>
-                              <span>Station Analytics</span>
+                              <span>Station Overview</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </>
                           )}
@@ -557,11 +553,11 @@ export function CityAirQualityPanel({
                               {navigatingStationId === alt.id ? (
                                 <>
                                   <Loader2 className="w-3 h-3 animate-spin" />
-                                  <span>Loading...</span>
+                                  <span>Opening...</span>
                                 </>
                               ) : (
                                 <>
-                                  <span>View Station</span>
+                                  <span>Station Overview</span>
                                   <ChevronRight className="w-3.5 h-3.5" />
                                 </>
                               )}

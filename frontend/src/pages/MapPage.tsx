@@ -422,8 +422,10 @@ export function MapPage() {
   };
 
   const handleSelectStation = (stationId: number) => {
+    setSelectedCity(null);
+    setFocusedStationId(null);
     setSelectedLocation(stationId);
-    navigate('/analytics');
+    navigate('/');
   };
 
   return (
