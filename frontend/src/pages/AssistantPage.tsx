@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Bot,
   Send,
@@ -55,17 +56,16 @@ function generateIntelligentAssistantAnswer(
   const pm10 = context.pm10;
 
   // Check recent conversation history for multi-turn context (e.g. following up "can you give me a time?")
-  const lastUserMsg = context.recentMessages
-    ?.filter((m) => m.role === 'user')
-    .slice(-2)[0]
-    ?.content.toLowerCase() || '';
+  const userMessages = context.recentMessages?.filter((m) => m.role === 'user') || [];
+  const lastUserMsg = userMessages.length > 0 ? userMessages[userMessages.length - 1].content.toLowerCase() : '';
 
-  const isTimingFollowUp =
+  const isTimingQuery =
     q.includes('time') ||
-    q.includes('when exactly') ||
+    q.includes('when') ||
     q.includes('which hour') ||
     q.includes('schedule') ||
-    q.includes('window');
+    q.includes('window') ||
+    q.includes('what time');
 
   // 1. Exact Time / Schedule / "When should I go out" / "Can you give me a time"
   if (
@@ -74,7 +74,8 @@ function generateIntelligentAssistantAnswer(
     q.includes('step out') ||
     q.includes('outdoor') ||
     q.includes('errand') ||
-    (isTimingFollowUp && (lastUserMsg.includes('out') || lastUserMsg.includes('run') || lastUserMsg.includes('walk') || lastUserMsg.includes('exercise') || lastUserMsg.includes('time')))
+    isTimingQuery ||
+    (lastUserMsg.includes('out') || lastUserMsg.includes('run') || lastUserMsg.includes('walk') || lastUserMsg.includes('exercise'))
   ) {
     if (aqi > 300) {
       return `For **${station}** (Current AQI: **${aqi}** — **${cat}**):\n\n⚠️ **Strict Outdoor Advisory:** Outdoor exposure is hazardous today. If you must step out, the least toxic window is strictly between **1:30 PM and 3:30 PM**, and an **N95 respirator mask is mandatory**.\n\n• 🛑 **Avoid completely:** Early morning (6:00 AM – 10:00 AM) and evening/night (after 6:30 PM) due to cold ground thermal inversions trapping ${dominant} near the surface.`;
@@ -144,7 +145,7 @@ function generateIntelligentAssistantAnswer(
   if (q.includes('pm2.5') || q.includes('pm25')) {
     return `**PM2.5 (Fine Combustion Particulates) Profile:**\n\n• **Current Reading at ${station}:** ${
       pm25 ? `${pm25.toFixed(1)} µg/m³` : 'Monitored'
-    }\n• **Why it's dangerous:** Particles $\\le 2.5$ microns penetrate past nasal cilia, deep into the lung alveoli, entering the blood stream. Chronic exposure elevates cardiovascular risks, reduces lung capacity, and aggravates respiratory ailments.\n• **Source:** Vehicle combustion, biomass burning, and industrial exhaust.`;
+    }\n• **Why it's dangerous:** Particles ≤ 2.5 microns penetrate past nasal cilia, deep into the lung alveoli, entering the blood stream. Chronic exposure elevates cardiovascular risks, reduces lung capacity, and aggravates respiratory ailments.\n• **Source:** Vehicle combustion, biomass burning, and industrial exhaust.`;
   }
 
   // 7. General Precautions & Daily Strategy
@@ -159,6 +160,37 @@ function generateIntelligentAssistantAnswer(
 
   // Default fallback — dynamic, informative, and context-rich (NEVER a canned robotic repetition)
   return `At **${station}**, the live CPCB AQI is currently **${aqi} (${cat})**, with **${dominant}** as the primary active pollutant.\n\n• **Cleanest Time Today:** **1:00 PM to 4:30 PM** (highest atmospheric convective mixing).\n• **Hours to Avoid:** **6:30 AM – 9:30 AM** and **after 7:30 PM** (surface thermal inversions).\n• **Exercise / Going Out:** Moderate outdoor activities are acceptable in the afternoon for healthy adults; sensitive groups should avoid heavy exertion.\n\nYou can ask me specific questions like: *"When should I go out?"*, *"Can you give me a time?"*, *"Is it safe to run?"*, or *"Do I need a mask today?"*.`;
+}
+
+function FormattedMessage({ content }: { content: string }) {
+  // Normalize bullet points (like "• ") into standard markdown list syntax "- " so ReactMarkdown renders them as proper HTML lists
+  const normalized = content.replace(/^[•●]\s+/gm, '- ');
+
+  return (
+    <div className="text-xs sm:text-sm text-foreground space-y-2 leading-relaxed">
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+          strong: ({ children }) => (
+            <strong className="font-extrabold text-foreground tracking-tight">{children}</strong>
+          ),
+          ul: ({ children }) => <ul className="my-2 space-y-1 pl-4 list-disc marker:text-primary">{children}</ul>,
+          ol: ({ children }) => <ol className="my-2 space-y-1 pl-4 list-decimal marker:text-primary">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed pl-0.5">{children}</li>,
+          h1: ({ children }) => <h3 className="font-bold text-base text-foreground mt-2 mb-1">{children}</h3>,
+          h2: ({ children }) => <h3 className="font-bold text-base text-foreground mt-2 mb-1">{children}</h3>,
+          h3: ({ children }) => <h4 className="font-bold text-sm text-foreground mt-2 mb-1">{children}</h4>,
+          code: ({ children }) => (
+            <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-[11px] text-primary font-semibold">
+              {children}
+            </code>
+          ),
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 export function AssistantPage() {
@@ -255,7 +287,13 @@ export function AssistantPage() {
     }
 
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Clean markdown characters (*, #, _, `, bullet points) so speech synthesis doesn't say "asterisk asterisk"
+    const cleanSpeech = text
+      .replace(/[*#_`~]/g, '')
+      .replace(/^[•●-]\s+/gm, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
     utterance.lang = 'en-IN';
     utterance.rate = 1.0;
     utterance.onend = () => setCurrentlySpeakingIndex(null);
@@ -360,10 +398,14 @@ export function AssistantPage() {
               className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm space-y-2 shadow-xs ${
                 m.role === 'user'
                   ? 'bg-primary text-primary-foreground rounded-br-none'
-                  : 'bg-card border border-border rounded-bl-none'
+                  : 'bg-card border border-border rounded-bl-none text-foreground'
               }`}
             >
-              <p className="whitespace-pre-line leading-relaxed">{m.content}</p>
+              {m.role === 'user' ? (
+                <p className="whitespace-pre-line leading-relaxed">{m.content}</p>
+              ) : (
+                <FormattedMessage content={m.content} />
+              )}
 
               <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[10px] opacity-75">
                 <span>{m.timestamp}</span>
