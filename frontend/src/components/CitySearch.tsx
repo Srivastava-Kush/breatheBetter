@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
-import { Search, MapPin, X, Building2 } from 'lucide-react';
+import { Search, Globe, X, Building2 } from 'lucide-react';
 import { citiesApi } from '../api/endpoints';
 
 export interface SelectedCity {
@@ -17,12 +17,14 @@ interface CitySearchProps {
   onSelectCity: (city: SelectedCity) => void;
   placeholder?: string;
   className?: string;
+  scope?: 'india' | 'global';
 }
 
 export function CitySearch({
   onSelectCity,
-  placeholder = 'Search Indian city (e.g. Prayagraj, Lucknow, Varanasi)...',
+  placeholder,
   className = '',
+  scope = 'india',
 }: CitySearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SelectedCity[]>([]);
@@ -30,6 +32,30 @@ export function CitySearch({
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  const defaultPlaceholder =
+    scope === 'global'
+      ? 'Search global city (e.g. London, Tokyo, New York, Paris)...'
+      : 'Search Indian city (e.g. Prayagraj, Lucknow, Varanasi)...';
+
+  const effectivePlaceholder = placeholder || defaultPlaceholder;
+
+  const loadingText =
+    scope === 'global'
+      ? 'Searching global cities worldwide...'
+      : 'Searching cities across India...';
+
+  const emptyText =
+    scope === 'global'
+      ? `No matching global cities found for "${query}"`
+      : `No matching Indian cities found for "${query}"`;
+
+  // Reset search when scope changes between India and World
+  useEffect(() => {
+    setQuery('');
+    setResults([]);
+    setOpen(false);
+  }, [scope]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -46,7 +72,8 @@ export function CitySearch({
     }
     setLoading(true);
     try {
-      const res = await citiesApi.search(q);
+      const countryCode = scope === 'global' ? '' : 'IN';
+      const res = await citiesApi.search(q, countryCode);
       setResults(res.data ?? []);
     } catch {
       setResults([]);
@@ -71,7 +98,8 @@ export function CitySearch({
       } else if (query.trim().length >= 2) {
         setLoading(true);
         try {
-          const res = await citiesApi.search(query.trim());
+          const countryCode = scope === 'global' ? '' : 'IN';
+          const res = await citiesApi.search(query.trim(), countryCode);
           if (res.data && res.data.length > 0) {
             handleSelect(res.data[0]);
           }
@@ -106,9 +134,9 @@ export function CitySearch({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => query.length >= 2 && setOpen(true)}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           className="w-full h-10 pl-9 pr-9 rounded-xl border border-border bg-card/95 backdrop-blur-xs text-sm shadow-sm
-                     focus:outline-none focus:ring-2 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+                     focus:outline-none focus:ring-2 focus:ring-primary text-foreground placeholder:text-muted-foreground transition-all"
         />
         {query && (
           <button
@@ -125,12 +153,12 @@ export function CitySearch({
           {loading && (
             <div className="p-3 text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
               <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              Searching cities across India...
+              {loadingText}
             </div>
           )}
           {!loading && results.length === 0 && (
             <div className="p-4 text-sm text-muted-foreground text-center">
-              No matching Indian cities found for "{query}"
+              {emptyText}
             </div>
           )}
           {results.map((city) => (
@@ -141,7 +169,11 @@ export function CitySearch({
             >
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Building2 className="w-4 h-4 text-primary" />
+                  {scope === 'global' ? (
+                    <Globe className="w-4 h-4 text-primary" />
+                  ) : (
+                    <Building2 className="w-4 h-4 text-primary" />
+                  )}
                 </div>
                 <div>
                   <div className="text-sm font-medium text-foreground">{city.name}</div>
@@ -151,7 +183,8 @@ export function CitySearch({
                 </div>
               </div>
               <div className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
-                {city.latitude.toFixed(2)}°, {city.longitude.toFixed(2)}°
+                {Math.abs(city.latitude).toFixed(2)}°{city.latitude >= 0 ? 'N' : 'S'},{' '}
+                {Math.abs(city.longitude).toFixed(2)}°{city.longitude >= 0 ? 'E' : 'W'}
               </div>
             </button>
           ))}

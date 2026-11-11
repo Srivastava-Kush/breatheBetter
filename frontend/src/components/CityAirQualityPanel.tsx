@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Compass,
   Check,
+  Minimize2,
+  Maximize2,
+  Loader2,
 } from 'lucide-react';
 import { useCityAirQuality } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
@@ -26,6 +29,7 @@ interface CityAirQualityPanelProps {
   onAutoPan?: (coords: Array<[number, number]>) => void;
   onFocusStation?: (stationId: number, lat: number, lng: number) => void;
   focusedStationId?: number | null;
+  onStationsLoaded?: (stations: any[], radiusKm: number) => void;
 }
 
 export function CityAirQualityPanel({
@@ -35,9 +39,12 @@ export function CityAirQualityPanel({
   onAutoPan,
   onFocusStation,
   focusedStationId,
+  onStationsLoaded,
 }: CityAirQualityPanelProps) {
   const [radius, setRadius] = useState<number>(25);
   const [localFocusedId, setLocalFocusedId] = useState<number | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [navigatingStationId, setNavigatingStationId] = useState<number | null>(null);
   const activeFocusId = focusedStationId ?? localFocusedId;
   const navigate = useNavigate();
   const { setSelectedLocation } = useAppStore();
@@ -55,6 +62,13 @@ export function CityAirQualityPanel({
   const stations = cityData?.stations || [];
   const nearestAlternatives = cityData?.nearestAlternativeStations || [];
   const modelledFallback = cityData?.modelledFallback;
+
+  // Propagate newly discovered stations and active search radius to parent map layer
+  useEffect(() => {
+    if (stations && stations.length > 0 && onStationsLoaded) {
+      onStationsLoaded(stations, radius);
+    }
+  }, [stations, radius, onStationsLoaded]);
 
   // Auto-pan map when stations or alternatives are loaded
   useEffect(() => {
@@ -75,16 +89,24 @@ export function CityAirQualityPanel({
   }, [stations, nearestAlternatives, onAutoPan]);
 
   const handleOpenStation = (stationId: number) => {
+    setNavigatingStationId(stationId);
     setSelectedLocation(stationId);
-    if (onSelectStation) {
-      onSelectStation(stationId);
-    } else {
-      navigate('/');
-    }
+    // Smooth micro-timeout to display immediate interactive loading feedback before route transition
+    setTimeout(() => {
+      if (onSelectStation) {
+        onSelectStation(stationId);
+      } else {
+        navigate('/analytics');
+      }
+    }, 220);
   };
 
   const handlePanToStation = (stationId: number, lat: number, lng: number) => {
     setLocalFocusedId(stationId);
+    // On small screens, collapse the panel so the user can immediately see the focused marker
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsCollapsed(true);
+    }
     if (onFocusStation) {
       onFocusStation(stationId, lat, lng);
     } else if (onAutoPan) {
@@ -100,6 +122,37 @@ export function CityAirQualityPanel({
   const explicitNoStationMessage = isGoa
     ? 'No ground station was found in Goa on the OpenAQ platform as of now.'
     : (cityData?.noStationMessage || `No ground station was found in ${city.state || city.name} on the OpenAQ platform as of now.`);
+
+  // Collapsed Minimal Peek Pill
+  if (isCollapsed) {
+    return (
+      <div className="absolute top-16 right-3 z-[1000] flex items-center gap-2 p-2 px-3 rounded-2xl bg-card/95 backdrop-blur-md border border-border shadow-2xl animate-in fade-in duration-200">
+        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Building2 className="w-4 h-4 text-primary" />
+        </div>
+        <div className="text-left">
+          <div className="text-xs font-bold text-foreground leading-tight">{city.name}</div>
+          <div className="text-[10px] text-muted-foreground">{stations.length} stations</div>
+        </div>
+        <div className="h-4 w-px bg-border/60 mx-1" />
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors"
+          title="Expand Panel"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+          <span>Expand</span>
+        </button>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Close"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute top-16 right-3 bottom-8 z-[1000] w-full max-w-md bg-card/98 backdrop-blur-md border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden text-foreground animate-in slide-in-from-right duration-200">
@@ -117,17 +170,27 @@ export function CityAirQualityPanel({
               {[city.district, city.state, city.country].filter(Boolean).join(', ')}
             </p>
             <div className="text-[11px] text-muted-foreground/80 font-mono mt-0.5">
-              {city.latitude.toFixed(4)}°N, {city.longitude.toFixed(4)}°E
+              {Math.abs(city.latitude).toFixed(4)}°{city.latitude >= 0 ? 'N' : 'S'},{' '}
+              {Math.abs(city.longitude).toFixed(4)}°{city.longitude >= 0 ? 'E' : 'W'}
             </div>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Close panel"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Minimize panel (Peek map)"
+          >
+            <Minimize2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Close panel"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Radius Filter & Quick Stats */}
@@ -141,11 +204,10 @@ export function CityAirQualityPanel({
             <button
               key={r}
               onClick={() => setRadius(r)}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
-                radius === r
-                  ? 'bg-primary text-primary-foreground shadow-xs'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${radius === r
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
             >
               {r} km
             </button>
@@ -240,11 +302,10 @@ export function CityAirQualityPanel({
                   return (
                     <div
                       key={st.id}
-                      className={`p-3.5 rounded-xl transition-all shadow-xs space-y-2 ${
-                        isFocused
-                          ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
-                          : 'bg-card border border-border hover:border-primary/50'
-                      }`}
+                      className={`p-3.5 rounded-xl transition-all shadow-xs space-y-2 ${isFocused
+                        ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
+                        : 'bg-card border border-border hover:border-primary/50'
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
@@ -313,11 +374,10 @@ export function CityAirQualityPanel({
                       <div className="grid grid-cols-2 gap-1.5 mt-1.5">
                         <button
                           onClick={() => handlePanToStation(st.id, st.coordinates.latitude, st.coordinates.longitude)}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                            isFocused
-                              ? 'bg-primary text-primary-foreground shadow-xs'
-                              : 'border border-border bg-card hover:bg-muted text-foreground'
-                          }`}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${isFocused
+                            ? 'bg-primary text-primary-foreground shadow-xs'
+                            : 'border border-border bg-card hover:bg-muted text-foreground'
+                            }`}
                         >
                           {isFocused ? (
                             <>
@@ -333,10 +393,24 @@ export function CityAirQualityPanel({
                         </button>
                         <button
                           onClick={() => handleOpenStation(st.id)}
-                          className="py-1.5 px-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-1 transition-colors shadow-xs"
+                          disabled={navigatingStationId !== null}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                            navigatingStationId === st.id
+                              ? 'bg-primary/80 text-primary-foreground opacity-90'
+                              : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          }`}
                         >
-                          Station Analytics
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          {navigatingStationId === st.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Loading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Station Analytics</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -405,11 +479,10 @@ export function CityAirQualityPanel({
                       return (
                         <div
                           key={`alt-${alt.id}`}
-                          className={`p-3 rounded-xl transition-all shadow-xs space-y-2 ${
-                            isFocused
-                              ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
-                              : 'bg-card border border-border hover:border-primary/50'
-                          }`}
+                          className={`p-3 rounded-xl transition-all shadow-xs space-y-2 ${isFocused
+                            ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
+                            : 'bg-card border border-border hover:border-primary/50'
+                            }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
@@ -455,11 +528,10 @@ export function CityAirQualityPanel({
                           <div className="grid grid-cols-2 gap-1.5 mt-1">
                             <button
                               onClick={() => handlePanToStation(alt.id, alt.coordinates.latitude, alt.coordinates.longitude)}
-                              className={`py-1 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer ${
-                                isFocused
-                                  ? 'bg-primary text-primary-foreground shadow-xs'
-                                  : 'border border-border bg-card hover:bg-muted text-foreground'
-                              }`}
+                              className={`py-1 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer ${isFocused
+                                ? 'bg-primary text-primary-foreground shadow-xs'
+                                : 'border border-border bg-card hover:bg-muted text-foreground'
+                                }`}
                             >
                               {isFocused ? (
                                 <>
@@ -475,10 +547,24 @@ export function CityAirQualityPanel({
                             </button>
                             <button
                               onClick={() => handleOpenStation(alt.id)}
-                              className="py-1 px-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-1 transition-colors shadow-xs"
+                              disabled={navigatingStationId !== null}
+                              className={`py-1 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer ${
+                                navigatingStationId === alt.id
+                                  ? 'bg-primary/80 text-primary-foreground opacity-90'
+                                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                              }`}
                             >
-                              View Station
-                              <ChevronRight className="w-3.5 h-3.5" />
+                              {navigatingStationId === alt.id ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Loading...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>View Station</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>

@@ -10,6 +10,7 @@ import { getAQIColorHex } from '../utils';
 interface GlobalClusterMapLayerProps {
   locations: Location[];
   onSelectStation: (locationId: number) => void;
+  focusedStationId?: number | null;
 }
 
 /**
@@ -18,9 +19,14 @@ interface GlobalClusterMapLayerProps {
  * Clusters international and domestic stations into regional count bubbles to maintain
  * 60 FPS performance across the entire globe, expanding into individual tactile AQI pins on zoom.
  */
-export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClusterMapLayerProps) {
+export function GlobalClusterMapLayer({
+  locations,
+  onSelectStation,
+  focusedStationId,
+}: GlobalClusterMapLayerProps) {
   const map = useMap();
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const focusedLayerRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!map) return;
@@ -45,8 +51,12 @@ export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClus
       },
     });
 
+    const focusedLayer = L.layerGroup();
     clusterGroupRef.current = clusterGroup;
+    focusedLayerRef.current = focusedLayer;
+
     map.addLayer(clusterGroup);
+    map.addLayer(focusedLayer);
 
     return () => {
       if (clusterGroupRef.current) {
@@ -54,20 +64,28 @@ export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClus
         clusterGroupRef.current.clearLayers();
         clusterGroupRef.current = null;
       }
+      if (focusedLayerRef.current) {
+        map.removeLayer(focusedLayerRef.current);
+        focusedLayerRef.current.clearLayers();
+        focusedLayerRef.current = null;
+      }
     };
   }, [map]);
 
   useEffect(() => {
     const clusterGroup = clusterGroupRef.current;
-    if (!clusterGroup) return;
+    const focusedLayer = focusedLayerRef.current;
+    if (!clusterGroup || !focusedLayer) return;
 
     clusterGroup.clearLayers();
+    focusedLayer.clearLayers();
 
     locations.forEach((loc) => {
       const { latitude, longitude } = loc.coordinates;
       if (!latitude || !longitude) return;
 
       const aqi = loc.latestAqi;
+      const isFocused = loc.openaqId === focusedStationId;
       const color = aqi?.category
         ? getAQIColorHex(aqi.category as AQICategory)
         : '#9ca3af';
@@ -76,40 +94,83 @@ export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClus
       const textColor = aqi?.category === 'Moderate' ? '#111827' : '#ffffff';
 
       const stationIcon = L.divIcon({
-        className: 'bb-station-marker-container',
+        className: `bb-station-marker-container ${isFocused ? 'bb-marker-focused' : ''}`,
         html: `
-          <div class="bb-station-pin group" style="
-            background-color: ${color};
-            color: ${textColor};
-            border: 2px solid #ffffff;
-            border-radius: 9999px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-            min-width: 44px;
-            height: 28px;
-            padding: 0 7px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            cursor: pointer;
-            position: relative;
-            user-select: none;
-            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease-out;
-          ">
-            <span>${aqiVal}</span>
-            <div style="
-              position: absolute;
-              bottom: -5px;
-              left: 50%;
-              transform: translateX(-50%);
-              width: 0;
-              height: 0;
-              border-left: 5px solid transparent;
-              border-right: 5px solid transparent;
-              border-top: 5px solid ${color};
-            "></div>
+          <div class="relative flex items-center justify-center">
+            ${
+              isFocused
+                ? `
+              <div class="bb-sonar-ring bb-sonar-ring-1"></div>
+              <div class="bb-sonar-ring bb-sonar-ring-2"></div>
+              <div class="bb-sonar-ring bb-sonar-ring-3"></div>
+              <div style="
+                position: absolute;
+                bottom: 40px;
+                left: 50%;
+                transform: translateX(-50%);
+                white-space: nowrap;
+                z-index: 50000;
+                pointer-events: none;
+                animation: beacon-bounce 1.5s ease-in-out infinite;
+              ">
+                <div style="
+                  background: #059669;
+                  color: #ffffff;
+                  font-size: 10px;
+                  font-weight: 800;
+                  letter-spacing: 0.04em;
+                  padding: 2.5px 8px;
+                  border-radius: 9999px;
+                  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.5);
+                  border: 1.5px solid #ffffff;
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                ">
+                  <span>🎯 FOCUSED MONITOR</span>
+                </div>
+                <div class="bb-focus-beacon-arrow"></div>
+              </div>
+            `
+                : ''
+            }
+            <div class="bb-station-pin group" style="
+              background-color: ${color};
+              color: ${textColor};
+              border: ${isFocused ? '3.5px solid #10b981' : '2px solid #ffffff'};
+              border-radius: 9999px;
+              box-shadow: ${
+                isFocused
+                  ? '0 0 0 6px rgba(16, 185, 129, 0.6), 0 0 35px rgba(16, 185, 129, 0.95), 0 8px 24px rgba(0, 0, 0, 0.5)'
+                  : '0 4px 14px rgba(0, 0, 0, 0.35)'
+              };
+              min-width: ${isFocused ? '52px' : '44px'};
+              height: ${isFocused ? '32px' : '28px'};
+              padding: 0 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 13px;
+              font-weight: 800;
+              letter-spacing: -0.02em;
+              cursor: pointer;
+              position: relative;
+              user-select: none;
+              transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease-out;
+            ">
+              <span>${aqiVal}</span>
+              <div style="
+                position: absolute;
+                bottom: -5px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid ${color};
+              "></div>
+            </div>
           </div>
         `,
         iconSize: [44, 32],
@@ -120,6 +181,7 @@ export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClus
       const marker = L.marker([latitude, longitude], {
         icon: stationIcon,
         riseOnHover: true,
+        zIndexOffset: isFocused ? 50000 : 0,
       });
 
       marker.on('mouseover', () => {
@@ -185,7 +247,11 @@ export function GlobalClusterMapLayer({ locations, onSelectStation }: GlobalClus
       popupContent.appendChild(actionBtn);
 
       marker.bindPopup(popupContent, { maxWidth: 280 });
-      clusterGroup.addLayer(marker);
+      if (isFocused) {
+        focusedLayer.addLayer(marker);
+      } else {
+        clusterGroup.addLayer(marker);
+      }
     });
   }, [locations, onSelectStation]);
 

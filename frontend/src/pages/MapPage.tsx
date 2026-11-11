@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Circle, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useLocations } from '../hooks/useAirQuality';
@@ -42,10 +42,12 @@ function FloatingMapControls({
   mapContainerRef,
   tileLayerType,
   onToggleTileLayer,
+  geoScope = 'india',
 }: {
   mapContainerRef: React.RefObject<HTMLDivElement | null>;
   tileLayerType: 'streets' | 'satellite';
   onToggleTileLayer: () => void;
+  geoScope?: 'india' | 'global';
 }) {
   const map = useMap();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -62,7 +64,11 @@ function FloatingMapControls({
   const handleZoomIn = () => map.zoomIn();
   const handleZoomOut = () => map.zoomOut();
   const handleReset = () => {
-    map.flyTo(INDIA_CENTER, 5, { duration: 1.2 });
+    if (geoScope === 'global') {
+      map.flyTo([25.0, 15.0], 2.5, { duration: 1.2 });
+    } else {
+      map.flyTo(INDIA_CENTER, 5, { duration: 1.2 });
+    }
   };
   const handleLocate = () => {
     if (!navigator.geolocation) return;
@@ -118,11 +124,11 @@ function FloatingMapControls({
         <Navigation className={`w-4 h-4 ${isLocating ? 'text-primary' : 'text-foreground'}`} />
       </button>
 
-      {/* Reset to Pan-India Overview */}
+      {/* Reset Overview */}
       <button
         onClick={handleReset}
         className="p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted text-foreground transition-all hover:scale-105"
-        title="Reset to Pan-India Overview"
+        title={geoScope === 'global' ? 'Reset to Global Overview' : 'Reset to Pan-India Overview'}
       >
         <RotateCcw className="w-4 h-4 text-foreground" />
       </button>
@@ -150,26 +156,46 @@ function FloatingMapControls({
   );
 }
 
-function MapViewportHandler({ targets }: { targets: Array<[number, number]> | null }) {
+function MapViewportHandler({
+  targets,
+  isPanelOpen = false,
+}: {
+  targets: Array<[number, number]> | null;
+  isPanelOpen?: boolean;
+}) {
   const map = useMap();
 
   useEffect(() => {
     if (!targets || targets.length === 0) return;
 
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
     if (targets.length === 1) {
       const currentZoom = map.getZoom();
       // Smoothly center on station without restricting user's zoom level
-      const targetZoom = currentZoom >= 10 ? currentZoom : 11;
-      map.flyTo(targets[0], targetZoom, { duration: 0.9 });
+      const targetZoom = currentZoom >= 11 ? currentZoom : 12;
+
+      // When the city panel is open on desktop, offset camera to center station in unobstructed visible canvas
+      const panelOffsetPx = isPanelOpen && isDesktop ? 220 : 0;
+
+      if (panelOffsetPx > 0) {
+        const targetPoint = map.project(targets[0], targetZoom);
+        const shiftedPoint = new L.Point(targetPoint.x + panelOffsetPx, targetPoint.y);
+        const shiftedLatLng = map.unproject(shiftedPoint, targetZoom);
+        map.flyTo(shiftedLatLng, targetZoom, { duration: 0.9 });
+      } else {
+        map.flyTo(targets[0], targetZoom, { duration: 0.9 });
+      }
     } else {
       const bounds = L.latLngBounds(targets.map((c) => L.latLng(c[0], c[1])));
       map.fitBounds(bounds, {
-        padding: [60, 60],
+        paddingTopLeft: [50, 50],
+        paddingBottomRight: [isPanelOpen && isDesktop ? 460 : 50, 50],
         maxZoom: 13,
         animate: true,
       });
     }
-  }, [targets, map]);
+  }, [targets, isPanelOpen, map]);
 
   return null;
 }
@@ -226,8 +252,66 @@ export function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [tileLayerType, setTileLayerType] = useState<'streets' | 'satellite'>('streets');
 
+  // Dynamically discovered stations from city searches
+  const [searchedStations, setSearchedStations] = useState<Location[]>([]);
+  const [searchRadiusKm, setSearchRadiusKm] = useState<number>(25);
+
+  const handleCityStationsLoaded = useCallback((newStations: any[], radiusKm: number) => {
+    setSearchRadiusKm(radiusKm);
+    if (!newStations || newStations.length === 0) return;
+
+    setSearchedStations((prev) => {
+      const existingIds = new Set(prev.map((p) => p.openaqId));
+      const additions: Location[] = [];
+
+      newStations.forEach((s: any) => {
+        const id = s.id || s.openaqId;
+        if (!id || existingIds.has(id)) return;
+        existingIds.add(id);
+
+        additions.push({
+          openaqId: id,
+          name: s.name,
+          locality: s.locality || null,
+          timezone: 'UTC',
+          country: {
+            code: s.country?.code || (selectedCity?.country === 'India' ? 'IN' : 'INTL'),
+            name: s.country?.name || selectedCity?.country || 'Unknown',
+          },
+          owner: null,
+          provider: s.provider ? { id: 0, name: s.provider } : null,
+          isMobile: false,
+          isMonitor: s.isMonitor ?? true,
+          coordinates: {
+            latitude: s.coordinates.latitude,
+            longitude: s.coordinates.longitude,
+          },
+          sensors: s.sensors || [],
+          lastSyncedAt: s.dataFreshness || new Date().toISOString(),
+          latestAqi: s.isValidAqi && s.aqi !== null
+            ? {
+                value: s.aqi,
+                category: s.aqiCategory,
+                dominantPollutant: s.dominantPollutant,
+              }
+            : undefined,
+        });
+      });
+
+      return additions.length > 0 ? [...prev, ...additions] : prev;
+    });
+  }, [selectedCity]);
+
+  // Combine baseline locations with newly searched stations
+  const combinedLocations = useMemo(() => {
+    if (searchedStations.length === 0) return rawLocations;
+    const existing = new Set(rawLocations.map((l) => l.openaqId));
+    const newItems = searchedStations.filter((s) => !existing.has(s.openaqId));
+    return [...rawLocations, ...newItems];
+  }, [rawLocations, searchedStations]);
+
   // Apply filters
-  const filteredLocations = rawLocations.filter((loc) => {
+  const filteredLocations = combinedLocations.filter((loc) => {
     // 1. AQI Category filter
     if (selectedCategory && loc.latestAqi?.category !== selectedCategory) {
       return false;
@@ -310,23 +394,20 @@ export function MapPage() {
   }, [filteredLocations, timeHorizon]);
 
   const handleCitySelect = (city: SelectedCity) => {
+    // If selecting an international city, automatically unlock sovereign bounds and switch to global scope
+    const isInternational =
+      city.country !== 'India' &&
+      city.country !== 'IN' &&
+      (city.latitude < 6.5 || city.latitude > 37.5 || city.longitude < 68.0 || city.longitude > 97.5);
+
+    if (isInternational && geoScope === 'india') {
+      setGeoScope('global');
+      setHighlightIndia(false);
+    }
+
     setSelectedCity(city);
     setFocusedStationId(null);
-
-    // Check if we have multiple ground stations in this city in our loaded station list
-    const cityStations = rawLocations.filter((loc) => {
-      const latDiff = Math.abs(loc.coordinates.latitude - city.latitude);
-      const lngDiff = Math.abs(loc.coordinates.longitude - city.longitude);
-      return latDiff < 0.25 && lngDiff < 0.25;
-    });
-
-    if (cityStations.length > 1) {
-      setViewportTargets(
-        cityStations.map((s) => [s.coordinates.latitude, s.coordinates.longitude])
-      );
-    } else {
-      setViewportTargets([[city.latitude, city.longitude]]);
-    }
+    setViewportTargets([[city.latitude, city.longitude]]);
   };
 
   const handleAutoPan = (coords: Array<[number, number]>) => {
@@ -342,7 +423,7 @@ export function MapPage() {
 
   const handleSelectStation = (stationId: number) => {
     setSelectedLocation(stationId);
-    navigate('/');
+    navigate('/analytics');
   };
 
   return (
@@ -358,8 +439,8 @@ export function MapPage() {
               <h1 className="font-bold text-sm md:text-base leading-tight">Explore Air Quality Map</h1>
               <p className="text-xs text-muted-foreground">
                 {isLoading
-                  ? 'Loading monitoring network...'
-                  : `${filteredLocations.length} stations ${aqiFilter === 'valid' ? 'reporting live AQI' : 'visible'} across India`}
+                  ? (geoScope === 'global' ? 'Loading worldwide monitoring network...' : 'Loading monitoring network across India...')
+                  : `${filteredLocations.length} stations ${aqiFilter === 'valid' ? 'reporting live AQI' : 'visible'} ${geoScope === 'india' ? 'across India' : 'worldwide'}`}
               </p>
             </div>
           </div>
@@ -375,7 +456,7 @@ export function MapPage() {
 
         {/* City Search Bar (Integrated) */}
         <div className="w-full md:max-w-md">
-          <CitySearch onSelectCity={handleCitySelect} />
+          <CitySearch onSelectCity={handleCitySelect} scope={geoScope} />
         </div>
 
         {/* Desktop Quick Category Filters */}
@@ -593,7 +674,77 @@ export function MapPage() {
             <GlobalClusterMapLayer
               locations={displayedLocations}
               onSelectStation={handleSelectStation}
+              focusedStationId={focusedStationId}
             />
+          )}
+
+          {/* Active Searched City Center Focal Pin & Dynamic Radius Ring */}
+          {selectedCity && (
+            <>
+              <Circle
+                center={[selectedCity.latitude, selectedCity.longitude]}
+                radius={searchRadiusKm * 1000}
+                pathOptions={{
+                  color: '#2563eb',
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.07,
+                  weight: 2,
+                  dashArray: '5, 8',
+                }}
+              />
+              <Marker
+                position={[selectedCity.latitude, selectedCity.longitude]}
+                icon={L.divIcon({
+                  className: 'bb-city-center-marker-container',
+                  html: `
+                    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                      <div style="
+                        position: absolute;
+                        bottom: 22px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: #1e40af;
+                        color: #ffffff;
+                        font-size: 11px;
+                        font-weight: 800;
+                        padding: 3px 9px;
+                        border-radius: 9999px;
+                        white-space: nowrap;
+                        box-shadow: 0 4px 14px rgba(30, 64, 175, 0.4);
+                        border: 1.5px solid #ffffff;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        pointer-events: none;
+                        z-index: 40000;
+                      ">
+                        <span>📍 ${selectedCity.name}</span>
+                      </div>
+                      <div style="
+                        width: 14px;
+                        height: 14px;
+                        border-radius: 9999px;
+                        background: #2563eb;
+                        border: 2.5px solid #ffffff;
+                        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.4), 0 4px 10px rgba(0,0,0,0.3);
+                      "></div>
+                    </div>
+                  `,
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 12],
+                })}
+              >
+                <Popup>
+                  <div className="text-xs p-1">
+                    <strong className="text-sm font-bold text-gray-900">{selectedCity.name}</strong>
+                    <div className="text-gray-500">
+                      {[selectedCity.district, selectedCity.state, selectedCity.country].filter(Boolean).join(', ')}
+                    </div>
+                    <div className="mt-1 text-primary font-medium">Search Radius: {searchRadiusKm} km</div>
+                  </div>
+                </Popup>
+              </Marker>
+            </>
           )}
 
           {/* Interpolated dispersion halo rings if enabled */}
@@ -615,7 +766,12 @@ export function MapPage() {
               );
             })}
 
-          {viewportTargets && <MapViewportHandler targets={viewportTargets} />}
+          {viewportTargets && (
+            <MapViewportHandler
+              targets={viewportTargets}
+              isPanelOpen={!!selectedCity}
+            />
+          )}
 
           {/* Floating Geospatial Controls (Zoom, GPS, Reset, Satellite Toggle, Fullscreen) */}
           <FloatingMapControls
@@ -624,6 +780,7 @@ export function MapPage() {
             onToggleTileLayer={() =>
               setTileLayerType(tileLayerType === 'streets' ? 'satellite' : 'streets')
             }
+            geoScope={geoScope}
           />
         </MapContainer>
 
@@ -707,6 +864,7 @@ export function MapPage() {
             onAutoPan={handleAutoPan}
             onFocusStation={handleFocusStation}
             focusedStationId={focusedStationId}
+            onStationsLoaded={handleCityStationsLoaded}
           />
         )}
 

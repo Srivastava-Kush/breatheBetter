@@ -3,6 +3,7 @@ import { searchCities } from '../providers/openmeteo/geocoding.api';
 import { fetchCurrentModelledAirQuality } from '../providers/openmeteo/forecast.api';
 import { getNearbyLocations } from '../services/location.service';
 import { getLatestAQI } from '../services/aqi.service';
+import { Location } from '../models/Location';
 import { apiCache } from '../utils/cache';
 import { logger } from '../utils/logger';
 
@@ -82,6 +83,41 @@ export async function getCityAirQualityHandler(req: Request, res: Response): Pro
 
     // 1. Discover nearby ground stations
     const nearbyStations = await getNearbyLocations(lat, lng, radius, 20);
+
+    // Asynchronously persist newly discovered live ground stations to MongoDB catalogue
+    if (nearbyStations && nearbyStations.length > 0) {
+      Promise.all(
+        nearbyStations.map(async (st: any) => {
+          const stationId = st.openaqId || st.id;
+          if (!stationId || !st.coordinates?.latitude || !st.coordinates?.longitude) return;
+          try {
+            await Location.updateOne(
+              { openaqId: stationId },
+              {
+                $setOnInsert: {
+                  openaqId: stationId,
+                  name: st.name || `Station ${stationId}`,
+                  locality: st.locality || null,
+                  timezone: st.timezone || 'UTC',
+                  country: st.country || { code: 'INTL', name: 'International' },
+                  owner: st.owner || null,
+                  provider: st.provider || null,
+                  isMobile: st.isMobile ?? false,
+                  isMonitor: st.isMonitor ?? true,
+                  coordinates: st.coordinates,
+                  sensors: st.sensors || [],
+                  licenses: st.licenses || [],
+                  lastSyncedAt: new Date(),
+                },
+              },
+              { upsert: true }
+            );
+          } catch {
+            // Non-blocking background persistence
+          }
+        })
+      ).catch((e) => logger.debug('Background station persist failed:', e));
+    }
 
     // 2. Fetch measurements & calculated AQI for each station
     const stationsData = await Promise.all(
