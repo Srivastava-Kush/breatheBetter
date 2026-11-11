@@ -157,7 +157,10 @@ function MapViewportHandler({ targets }: { targets: Array<[number, number]> | nu
     if (!targets || targets.length === 0) return;
 
     if (targets.length === 1) {
-      map.flyTo(targets[0], 14, { duration: 1.2 });
+      const currentZoom = map.getZoom();
+      // Smoothly center on station without restricting user's zoom level
+      const targetZoom = currentZoom >= 10 ? currentZoom : 11;
+      map.flyTo(targets[0], targetZoom, { duration: 0.9 });
     } else {
       const bounds = L.latLngBounds(targets.map((c) => L.latLng(c[0], c[1])));
       map.fitBounds(bounds, {

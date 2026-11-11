@@ -97,6 +97,7 @@ body {
 .bb-station-marker-container {
   background: transparent !important;
   border: none !important;
+  overflow: visible !important;
 }
 .bb-station-marker-container:hover .bb-station-pin {
   transform: scale(1.18);
@@ -210,5 +211,57 @@ body {
 
 .animate-air-wave {
   animation: air-wave-slide 1.8s ease-in-out infinite;
+}
+
+/* Radar Sonar Wave Rings for Focused Map Station */
+@keyframes sonar-wave-expand {
+  0% {
+    width: 32px;
+    height: 32px;
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  60% {
+    opacity: 0.5;
+  }
+  100% {
+    width: 160px;
+    height: 160px;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+}
+
+.bb-sonar-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 9999px;
+  pointer-events: none;
+  border: 2.5px solid #10b981;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.05) 70%, transparent 100%);
+  animation: sonar-wave-expand 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) infinite;
+  z-index: 10;
+}
+
+.bb-sonar-ring-1 {
+  animation-delay: 0s;
+}
+
+.bb-sonar-ring-2 {
+  animation-delay: 0.8s;
+}
+
+.bb-sonar-ring-3 {
+  animation-delay: 1.6s;
+}
+
+.bb-focus-beacon-arrow {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #059669;
+  margin: 0 auto;
 }
 

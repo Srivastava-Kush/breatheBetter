@@ -64,86 +64,134 @@ export function StationMarkersLayer({ locations, onSelectStation, focusedStation
         ? L.divIcon({
             className: `bb-station-marker-container ${isFocused ? 'bb-marker-focused' : ''}`,
             html: `
-              <div class="bb-station-pin group" style="
-                background-color: ${color};
-                color: ${textColor};
-                border: ${isFocused ? '3px solid #10b981' : '2px solid #ffffff'};
-                border-radius: 9999px;
-                box-shadow: ${
+              <div class="relative flex items-center justify-center">
+                ${
                   isFocused
-                    ? '0 0 0 6px rgba(16, 185, 129, 0.5), 0 0 25px rgba(16, 185, 129, 0.9), 0 4px 18px rgba(0, 0, 0, 0.45)'
-                    : '0 4px 14px rgba(0, 0, 0, 0.35)'
-                };
-                min-width: 44px;
-                height: 28px;
-                padding: 0 7px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 13px;
-                font-weight: 800;
-                letter-spacing: -0.02em;
-                cursor: pointer;
-                position: relative;
-                user-select: none;
-                transform: ${isFocused ? 'scale(1.35)' : 'scale(1)'};
-                transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease-out;
-                z-index: ${isFocused ? '25000' : '1'};
-              ">
-                <span>${aqiVal}</span>
-                <div style="
-                  position: absolute;
-                  bottom: -5px;
-                  left: 50%;
-                  transform: translateX(-50%);
-                  width: 0;
-                  height: 0;
-                  border-left: 5px solid transparent;
-                  border-right: 5px solid transparent;
-                  border-top: 5px solid ${isFocused ? '#10b981' : color};
-                "></div>
+                    ? `
+                  <div class="bb-sonar-ring bb-sonar-ring-1"></div>
+                  <div class="bb-sonar-ring bb-sonar-ring-2"></div>
+                  <div class="bb-sonar-ring bb-sonar-ring-3"></div>
+                  <div style="
+                    position: absolute;
+                    bottom: 40px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    white-space: nowrap;
+                    z-index: 50000;
+                    pointer-events: none;
+                    animation: beacon-bounce 1.5s ease-in-out infinite;
+                  ">
+                    <div style="
+                      background: #059669;
+                      color: #ffffff;
+                      font-size: 10px;
+                      font-weight: 800;
+                      letter-spacing: 0.04em;
+                      padding: 2.5px 8px;
+                      border-radius: 9999px;
+                      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.5);
+                      border: 1.5px solid #ffffff;
+                      display: flex;
+                      align-items: center;
+                      gap: 4px;
+                    ">
+                      <span>🎯 FOCUSED MONITOR</span>
+                    </div>
+                    <div class="bb-focus-beacon-arrow"></div>
+                  </div>
+                `
+                    : ''
+                }
+                <div class="bb-station-pin group" style="
+                  background-color: ${color};
+                  color: ${textColor};
+                  border: ${isFocused ? '3.5px solid #10b981' : '2px solid #ffffff'};
+                  border-radius: 9999px;
+                  box-shadow: ${
+                    isFocused
+                      ? '0 0 0 6px rgba(16, 185, 129, 0.6), 0 0 35px rgba(16, 185, 129, 0.95), 0 8px 24px rgba(0, 0, 0, 0.5)'
+                      : '0 4px 14px rgba(0, 0, 0, 0.35)'
+                  };
+                  min-width: ${isFocused ? '52px' : '44px'};
+                  height: ${isFocused ? '32px' : '28px'};
+                  padding: 0 8px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: ${isFocused ? '15px' : '13px'};
+                  font-weight: 800;
+                  letter-spacing: -0.02em;
+                  cursor: pointer;
+                  position: relative;
+                  user-select: none;
+                  transform: ${isFocused ? 'scale(1.45)' : 'scale(1)'};
+                  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease-out;
+                  z-index: ${isFocused ? '40000' : '1'};
+                ">
+                  <span>${aqiVal}</span>
+                  <div style="
+                    position: absolute;
+                    bottom: -5px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 0;
+                    height: 0;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-top: 5px solid ${isFocused ? '#10b981' : color};
+                  "></div>
+                </div>
               </div>
             `,
-            iconSize: [44, 32],
-            iconAnchor: [22, 32],
-            popupAnchor: [0, -32],
+            iconSize: isFocused ? [54, 40] : [44, 32],
+            iconAnchor: isFocused ? [27, 40] : [22, 32],
+            popupAnchor: [0, -36],
           })
         : L.divIcon({
             className: `bb-station-dot-container ${isFocused ? 'bb-dot-focused' : ''}`,
             html: `
-              <div class="bb-station-dot group" style="
-                background-color: ${isFocused ? '#10b981' : '#94a3b8'};
-                border: 2px solid #ffffff;
-                border-radius: 9999px;
-                box-shadow: ${
+              <div class="relative flex items-center justify-center">
+                ${
                   isFocused
-                    ? '0 0 0 5px rgba(16, 185, 129, 0.55), 0 0 18px rgba(16, 185, 129, 0.85)'
-                    : '0 1px 4px rgba(0, 0, 0, 0.3)'
-                };
-                width: ${isFocused ? '16px' : '10px'};
-                height: ${isFocused ? '16px' : '10px'};
-                cursor: pointer;
-                transform: ${isFocused ? 'scale(1.3)' : 'scale(1)'};
-                transition: transform 0.2s ease-out;
-              " title="${loc.name} ${isFocused ? '(Focused)' : '(Awaiting telemetry cycle)'}"></div>
+                    ? `
+                  <div class="bb-sonar-ring bb-sonar-ring-1"></div>
+                  <div class="bb-sonar-ring bb-sonar-ring-2"></div>
+                `
+                    : ''
+                }
+                <div class="bb-station-dot group" style="
+                  background-color: ${isFocused ? '#10b981' : '#94a3b8'};
+                  border: ${isFocused ? '3px solid #ffffff' : '2px solid #ffffff'};
+                  border-radius: 9999px;
+                  box-shadow: ${
+                    isFocused
+                      ? '0 0 0 6px rgba(16, 185, 129, 0.6), 0 0 24px rgba(16, 185, 129, 0.95)'
+                      : '0 1px 4px rgba(0, 0, 0, 0.3)'
+                  };
+                  width: ${isFocused ? '20px' : '10px'};
+                  height: ${isFocused ? '20px' : '10px'};
+                  cursor: pointer;
+                  transform: ${isFocused ? 'scale(1.4)' : 'scale(1)'};
+                  transition: transform 0.2s ease-out;
+                " title="${loc.name} ${isFocused ? '(Focused)' : '(Awaiting telemetry cycle)'}"></div>
+              </div>
             `,
-            iconSize: isFocused ? [16, 16] : [10, 10],
-            iconAnchor: isFocused ? [8, 8] : [5, 5],
-            popupAnchor: [0, -8],
+            iconSize: isFocused ? [20, 20] : [10, 10],
+            iconAnchor: isFocused ? [10, 10] : [5, 5],
+            popupAnchor: [0, -12],
           });
 
       const marker = L.marker([latitude, longitude], {
         icon: stationIcon,
         riseOnHover: true,
-        zIndexOffset: isFocused ? 25000 : 0,
+        zIndexOffset: isFocused ? 45000 : 0,
       });
 
-      // Hover elevation: bring hovered marker above nearby overlapping pins in dense metros
       marker.on('mouseover', () => {
-        marker.setZIndexOffset(30000);
+        marker.setZIndexOffset(50000);
       });
       marker.on('mouseout', () => {
-        marker.setZIndexOffset(isFocused ? 25000 : 0);
+        marker.setZIndexOffset(isFocused ? 45000 : 0);
       });
 
       const isProjected = (aqi as any)?.isProjected;
