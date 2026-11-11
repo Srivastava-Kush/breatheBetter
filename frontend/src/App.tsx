@@ -12,6 +12,7 @@ import { AssistantPage } from './pages/AssistantPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ReportPage } from './pages/ReportPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="report" element={<ReportPage />} />
             <Route path="assistant" element={<AssistantPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

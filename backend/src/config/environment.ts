@@ -40,4 +40,9 @@ export const env = {
   gemini: {
     apiKey: process.env['GEMINI_API_KEY'] || null,
   },
+
+  jwt: {
+    secret: process.env['JWT_SECRET'] || 'breathebetter-jwt-secret-key-2026',
+    expiresIn: '30d',
+  },
 };

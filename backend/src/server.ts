@@ -19,6 +19,7 @@ import insightRoutes from './routes/insight.routes';
 import pollutionInsightRoutes from './routes/pollution-insight.routes';
 import alertRoutes from './routes/alert.routes';
 import cityRoutes from './routes/city.routes';
+import authRoutes from './routes/auth.routes';
 
 import { startLocationSyncJob } from './jobs/locationSync.job';
 import { startLatestReadingsJob } from './jobs/latestReadings.job';
@@ -76,6 +77,7 @@ async function bootstrap(): Promise<void> {
   app.use('/api/insights', pollutionInsightRoutes);
   app.use('/api/alerts', alertRoutes);
   app.use('/api/cities', cityRoutes);
+  app.use('/api/auth', authRoutes);
 
   // Error handling
   app.use(notFound);

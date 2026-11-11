@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
 import {
   Wind,
   AlertCircle,
@@ -7,6 +8,7 @@ import {
   Clock,
   TrendingUp,
   BellRing,
+  Bell,
   CloudSun,
   Droplets,
   Compass,
@@ -294,14 +296,19 @@ export function OverviewPage() {
   const pollutants = dashboard?.pollutants ?? {};
   const location = dashboard?.location;
 
-  const activeAlerts = (alertsData?.data ?? []).filter(
+  const userThresholdAlert = (alertsData?.data ?? []).find(
     (a: any) =>
       a.locationId === locationId &&
       a.isActive &&
       aqi?.value !== null &&
       aqi?.value !== undefined &&
-      aqi.value >= a.threshold
+      (a.condition === 'below'
+        ? aqi.value <= (a.aqiThreshold ?? a.threshold)
+        : aqi.value >= (a.aqiThreshold ?? a.threshold))
   );
+
+  const isSevereAir = aqi?.value !== undefined && aqi?.value !== null && aqi.value >= 150;
+  const isAlertTriggered = !!userThresholdAlert || isSevereAir;
 
   const atmosphereStyle = getCategoryAtmosphereStyle(aqi?.category ?? undefined);
   const aqiColor = getAQIColorHex(aqi?.category as AQICategory);
@@ -353,24 +360,45 @@ export function OverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-6xl mx-auto">
-      {/* Active Threshold Alert Banner */}
-      {activeAlerts.length > 0 && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 flex items-center justify-between gap-4 shadow-sm animate-in fade-in duration-200">
+      {/* Active Air Quality Alert Symbol & Banner on Home Page */}
+      {isAlertTriggered && (
+        <div
+          className={`p-4 rounded-2xl border shadow-sm animate-in fade-in duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            userThresholdAlert
+              ? 'bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-950/30 dark:border-rose-900/50 dark:text-rose-200'
+              : 'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/50 dark:text-amber-200'
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
+                userThresholdAlert ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
+              }`}
+            >
               <BellRing className="w-5 h-5 animate-bounce" />
             </div>
             <div>
-              <div className="font-extrabold text-sm">Active Air Quality Alert Exceeded!</div>
-              <div className="text-xs text-rose-800">
-                Current AQI <strong>{aqi?.value}</strong> exceeds your configured threshold of{' '}
-                <strong>{activeAlerts[0].threshold}</strong>.
+              <div className="font-extrabold text-sm flex items-center gap-2 flex-wrap">
+                <span>⚠️ {userThresholdAlert ? 'Personal Smart Alert Triggered!' : 'Elevated Air Pollution Advisory'}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/10 font-bold uppercase">
+                  AQI: {aqi?.value}
+                </span>
+              </div>
+              <div className="text-xs opacity-90 mt-0.5">
+                {userThresholdAlert
+                  ? `Current air quality at ${location?.name} exceeds your smart alert threshold of ${userThresholdAlert.aqiThreshold ?? userThresholdAlert.threshold} AQI.`
+                  : `Air quality at ${location?.name} is in the ${aqi?.category} range (${aqi?.value} AQI). Please limit prolonged outdoor exertion.`}
               </div>
             </div>
           </div>
-          <span className="text-[11px] font-bold uppercase px-3 py-1 rounded-full bg-rose-600 text-white shadow-xs">
-            Critical Threshold
-          </span>
+
+          <NavLink
+            to="/profile"
+            className="text-xs font-bold px-3.5 py-2 rounded-xl bg-card hover:bg-muted text-foreground border border-border shadow-xs flex items-center gap-1.5 shrink-0 self-start sm:self-auto transition-all"
+          >
+            <Bell className="w-3.5 h-3.5 text-primary" />
+            <span>Manage Smart Alerts →</span>
+          </NavLink>
         </div>
       )}
 
@@ -397,6 +425,12 @@ export function OverviewPage() {
               <span>{location?.name ?? 'Select Station'}</span>
               {location?.locality && (
                 <span className="text-primary font-bold">· {location.locality}</span>
+              )}
+              {isAlertTriggered && (
+                <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-xs animate-pulse">
+                  <BellRing className="w-3 h-3" />
+                  <span>ALERT ACTIVE</span>
+                </span>
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">

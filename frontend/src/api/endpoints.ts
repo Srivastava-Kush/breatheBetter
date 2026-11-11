@@ -233,3 +233,22 @@ export const alertsApi = {
   delete: (id: string) => apiClient.delete(`/alerts/${id}`).then((r) => r.data),
 };
 
+// Auth
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  createdAt?: string;
+}
+
+export const authApi = {
+  register: (data: { name: string; email: string; password: string }) =>
+    apiClient.post<ApiResponse<{ token: string; user: AuthUser }>>('/auth/register', data).then((r) => r.data),
+
+  login: (data: { email: string; password: string }) =>
+    apiClient.post<ApiResponse<{ token: string; user: AuthUser }>>('/auth/login', data).then((r) => r.data),
+
+  getMe: () =>
+    apiClient.get<ApiResponse<AuthUser>>('/auth/me').then((r) => r.data),
+};
+

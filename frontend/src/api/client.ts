@@ -10,6 +10,15 @@ export const apiClient = axios.create({
   },
 });
 
+// Request interceptor to attach JWT auth token
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('bb_auth_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,

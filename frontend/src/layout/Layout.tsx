@@ -15,11 +15,14 @@ import {
   Navigation,
   Trophy,
   FileText,
+  User,
+  Bell,
 } from 'lucide-react';
 import { useState } from 'react';
 import { LocationSearch } from '../components/LocationSearch';
 import { locationsApi } from '../api/endpoints';
 import { useAppStore } from '../stores/appStore';
+import { useAuthStore } from '../stores/authStore';
 import type { Location } from '../types';
 
 const NAV_ITEMS = [
@@ -33,6 +36,7 @@ const NAV_ITEMS = [
   { to: '/health', label: 'Health', icon: Heart },
   { to: '/forecast', label: 'Forecast & ML', icon: CloudSun },
   { to: '/assistant', label: 'AI Voice Assistant', icon: Bot },
+  { to: '/profile', label: 'Profile & Smart Alerts', icon: Bell },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -42,6 +46,7 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const { addRecentLocation, setSelectedLocation } = useAppStore();
+  const { user, isAuthenticated } = useAuthStore();
 
   const handleLocationSelect = (loc: Location) => {
     const targetId = Number(loc.openaqId || (loc as any).id);
@@ -235,6 +240,26 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <NavLink
+              to="/profile"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted text-foreground transition-all shadow-2xs"
+              title={isAuthenticated && user ? `Signed in as ${user.name}` : 'Sign In / Smart Alerts'}
+            >
+              {isAuthenticated && user ? (
+                <>
+                  <span className="w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="hidden sm:inline max-w-[80px] truncate">{user.name.split(' ')[0]}</span>
+                </>
+              ) : (
+                <>
+                  <User className="w-3.5 h-3.5 text-primary" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </>
+              )}
+            </NavLink>
+
             <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-[11px] font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>CPCB Ground Telemetry</span>

@@ -7,20 +7,36 @@ let inMemoryAlerts: any[] = [];
 
 export async function getAlerts(req: Request, res: Response): Promise<void> {
   try {
-    if (!isDbConnected) {
-      res.json({ success: true, data: inMemoryAlerts.filter((a) => a.isActive) });
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.json({ success: true, data: [] });
       return;
     }
-    const alerts = await UserAlert.find({ isActive: true }).sort({ createdAt: -1 });
+
+    if (!isDbConnected) {
+      res.json({
+        success: true,
+        data: inMemoryAlerts.filter((a) => a.userId === userId && a.isActive),
+      });
+      return;
+    }
+
+    const alerts = await UserAlert.find({ userId }).sort({ createdAt: -1 });
     res.json({ success: true, data: alerts });
   } catch (error) {
     logger.error('getAlerts error:', error);
-    res.json({ success: true, data: inMemoryAlerts.filter((a) => a.isActive) });
+    res.status(500).json({ success: false, error: 'Failed to fetch user alerts' });
   }
 }
 
 export async function createAlert(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
     const { locationId, stationName, aqiThreshold, condition, pollutant, notificationTypes } = req.body;
 
     if (!locationId || !stationName || aqiThreshold === undefined) {
@@ -31,6 +47,7 @@ export async function createAlert(req: Request, res: Response): Promise<void> {
     if (!isDbConnected) {
       const newAlert = {
         _id: 'mock-alert-' + Date.now(),
+        userId,
         locationId,
         stationName,
         aqiThreshold,
@@ -46,6 +63,7 @@ export async function createAlert(req: Request, res: Response): Promise<void> {
     }
 
     const alert = await UserAlert.create({
+      userId,
       locationId,
       stationName,
       aqiThreshold,
@@ -64,8 +82,14 @@ export async function createAlert(req: Request, res: Response): Promise<void> {
 
 export async function updateAlert(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
     if (!isDbConnected) {
-      const idx = inMemoryAlerts.findIndex((a) => a._id === req.params['id']);
+      const idx = inMemoryAlerts.findIndex((a) => a._id === req.params['id'] && a.userId === userId);
       if (idx === -1) {
         res.status(404).json({ success: false, error: 'Alert not found' });
         return;
@@ -75,8 +99,8 @@ export async function updateAlert(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const alert = await UserAlert.findByIdAndUpdate(
-      req.params['id'],
+    const alert = await UserAlert.findOneAndUpdate(
+      { _id: req.params['id'], userId },
       { $set: req.body },
       { new: true }
     );
@@ -93,18 +117,24 @@ export async function updateAlert(req: Request, res: Response): Promise<void> {
 
 export async function deleteAlert(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Authentication required' });
+      return;
+    }
+
     if (!isDbConnected) {
-      inMemoryAlerts = inMemoryAlerts.filter((a) => a._id !== req.params['id']);
+      inMemoryAlerts = inMemoryAlerts.filter((a) => !(a._id === req.params['id'] && a.userId === userId));
       res.json({ success: true, message: 'Alert deleted' });
       return;
     }
 
-    const alert = await UserAlert.findByIdAndDelete(req.params['id']);
+    const alert = await UserAlert.findOneAndDelete({ _id: req.params['id'], userId });
     if (!alert) {
       res.status(404).json({ success: false, error: 'Alert not found' });
       return;
     }
-    res.json({ success: true, message: 'Alert deleted' });
+    res.json({ success: true, message: 'Alert deleted successfully' });
   } catch (error) {
     logger.error('deleteAlert error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete alert' });

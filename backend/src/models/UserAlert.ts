@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUserAlert extends Document {
+  userId?: mongoose.Types.ObjectId | string;
   locationId: number;
   stationName: string;
   aqiThreshold: number;
@@ -16,6 +17,7 @@ export interface IUserAlert extends Document {
 
 const UserAlertSchema = new Schema<IUserAlert>(
   {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     locationId: { type: Number, required: true },
     stationName: { type: String, required: true },
     aqiThreshold: { type: Number, required: true, min: 0, max: 500 },
