@@ -30,7 +30,11 @@ export async function searchCitiesHandler(req: Request, res: Response): Promise<
       return;
     }
 
-    const cities = await searchCities(query, countryCode, 10);
+    let cities = await searchCities(query, countryCode, 10);
+    // If no Indian city found, fall back to global city discovery (e.g. London, Paris, Tokyo, New York)
+    if (cities.length === 0 && countryCode === 'IN') {
+      cities = await searchCities(query, '', 10);
+    }
     const payload = {
       success: true,
       meta: { count: cities.length, query },

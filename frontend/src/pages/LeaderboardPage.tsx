@@ -1,20 +1,56 @@
 import React, { useState, useMemo } from 'react';
-import { Trophy, AlertTriangle, ShieldCheck, MapPin, ArrowRight, ExternalLink, Filter } from 'lucide-react';
+import {
+  Trophy,
+  AlertTriangle,
+  ShieldCheck,
+  MapPin,
+  ArrowRight,
+  Filter,
+  Globe2,
+  Building2,
+  Sparkles,
+} from 'lucide-react';
 import { useLocations } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { AirLoadingWidget } from '../components/AirLoadingWidget';
 import { getAQIColorHex } from '../utils';
 import type { AQICategory } from '../types';
 
-export function LeaderboardPage() {
-  const { data, isLoading } = useLocations({ limit: 1000, country: 'IN' });
-  const { setSelectedLocation } = useAppStore();
-  const navigate = useNavigate();
+const COUNTRY_FLAGS: Record<string, string> = {
+  IN: '🇮🇳',
+  US: '🇺🇸',
+  GB: '🇬🇧',
+  DE: '🇩🇪',
+  FR: '🇫🇷',
+  JP: '🇯🇵',
+  AU: '🇦🇺',
+  AE: '🇦🇪',
+  SG: '🇸🇬',
+  TH: '🇹🇭',
+  CA: '🇨🇦',
+  BR: '🇧🇷',
+  MX: '🇲🇽',
+  ZA: '🇿🇦',
+  KR: '🇰🇷',
+  CL: '🇨🇱',
+};
 
+export function LeaderboardPage() {
+  const [scope, setScope] = useState<'india' | 'global'>('india');
   const [activeTab, setActiveTab] = useState<'cleanest' | 'polluted'>('cleanest');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
+
+  // Query India (country: 'IN') or Global International (country: 'GLOBAL_ONLY')
+  const { data, isLoading } = useLocations({
+    limit: 1000,
+    country: scope === 'india' ? 'IN' : 'GLOBAL_ONLY',
+  });
+
+  const { setSelectedLocation } = useAppStore();
+  const navigate = useNavigate();
 
   const rawStations = data?.data ?? [];
 
@@ -34,35 +70,76 @@ export function LeaderboardPage() {
   const regionalStations = useMemo(() => {
     if (selectedRegion === 'all') return validStations;
 
-    if (selectedRegion === 'gangetic') {
-      // UP, Bihar, Delhi, Punjab, Haryana
-      return validStations.filter((s) =>
-        ['Prayagraj', 'Lucknow', 'Varanasi', 'Kanpur', 'Patna', 'Delhi', 'Agra', 'Amritsar', 'Noida', 'Ghaziabad', 'Meerut'].some(
-          (city) => s.name.includes(city) || (s.locality && s.locality.includes(city))
-        )
-      );
-    }
+    if (scope === 'india') {
+      if (selectedRegion === 'gangetic') {
+        return validStations.filter((s) =>
+          [
+            'Prayagraj',
+            'Lucknow',
+            'Varanasi',
+            'Kanpur',
+            'Patna',
+            'Delhi',
+            'Agra',
+            'Amritsar',
+            'Noida',
+            'Ghaziabad',
+            'Meerut',
+          ].some((city) => s.name.includes(city) || (s.locality && s.locality.includes(city)))
+        );
+      }
 
-    if (selectedRegion === 'south') {
-      // Karnataka, Tamil Nadu, Kerala, Andhra, Telangana
-      return validStations.filter((s) =>
-        ['Bengaluru', 'Chennai', 'Hyderabad', 'Thiruvananthapuram', 'Kochi', 'Coimbatore', 'Belagavi', 'Hubballi', 'Mangaluru', 'Vijayawada'].some(
-          (city) => s.name.includes(city) || (s.locality && s.locality.includes(city))
-        )
-      );
-    }
+      if (selectedRegion === 'south') {
+        return validStations.filter((s) =>
+          [
+            'Bengaluru',
+            'Chennai',
+            'Hyderabad',
+            'Thiruvananthapuram',
+            'Kochi',
+            'Coimbatore',
+            'Belagavi',
+            'Hubballi',
+            'Mangaluru',
+            'Vijayawada',
+          ].some((city) => s.name.includes(city) || (s.locality && s.locality.includes(city)))
+        );
+      }
 
-    if (selectedRegion === 'west') {
-      // Maharashtra, Gujarat, Rajasthan
-      return validStations.filter((s) =>
-        ['Mumbai', 'Pune', 'Ahmedabad', 'Jaipur', 'Surat', 'Nagpur', 'Kolhapur', 'Nashik', 'Jodhpur', 'Kota'].some(
-          (city) => s.name.includes(city) || (s.locality && s.locality.includes(city))
-        )
-      );
+      if (selectedRegion === 'west') {
+        return validStations.filter((s) =>
+          [
+            'Mumbai',
+            'Pune',
+            'Ahmedabad',
+            'Jaipur',
+            'Surat',
+            'Nagpur',
+            'Kolhapur',
+            'Nashik',
+            'Jodhpur',
+            'Kota',
+          ].some((city) => s.name.includes(city) || (s.locality && s.locality.includes(city)))
+        );
+      }
+    } else {
+      // Global region filters
+      if (selectedRegion === 'north_america') {
+        return validStations.filter((s) => ['US', 'CA', 'MX'].includes(s.country?.code));
+      }
+      if (selectedRegion === 'europe') {
+        return validStations.filter((s) => ['GB', 'DE', 'FR', 'IT', 'ES', 'NL'].includes(s.country?.code));
+      }
+      if (selectedRegion === 'asia_pacific') {
+        return validStations.filter((s) => ['JP', 'AU', 'SG', 'TH', 'KR'].includes(s.country?.code));
+      }
+      if (selectedRegion === 'middle_east_africa') {
+        return validStations.filter((s) => ['AE', 'ZA', 'GH', 'KW', 'QA'].includes(s.country?.code));
+      }
     }
 
     return validStations;
-  }, [validStations, selectedRegion]);
+  }, [validStations, selectedRegion, scope]);
 
   const cleanestStations = useMemo(() => {
     return [...regionalStations].sort((a, b) => a.aqiVal - b.aqiVal).slice(0, 10);
@@ -79,47 +156,112 @@ export function LeaderboardPage() {
     navigate('/');
   };
 
+  const handleScopeChange = (newScope: 'india' | 'global') => {
+    setScope(newScope);
+    setSelectedRegion('all');
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
+      {/* High-Level Scope Switcher (India vs Global) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Trophy className="w-6 h-6 text-amber-500" />
-            National Air Quality Leaderboard
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Real-time ranking of India's cleanest air zones and most severe pollution hotspots.
+            <h1 className="text-2xl font-bold">
+              {scope === 'india' ? 'National Air Quality Leaderboard' : 'Global Air Quality Leaderboard'}
+            </h1>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {scope === 'india'
+              ? 'Real-time statutory CPCB rankings of India’s cleanest air zones and severe pollution hotspots'
+              : 'Real-time international air quality comparison across major world capitals and mega-cities'}
           </p>
         </div>
 
-        {/* Region Filter */}
-        <div className="flex items-center gap-2 text-xs">
-          <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border">
-            {[
-              { id: 'all', label: 'All India' },
-              { id: 'gangetic', label: 'Indo-Gangetic Belt' },
-              { id: 'south', label: 'Southern India' },
-              { id: 'west', label: 'Western India' },
-            ].map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRegion(r.id)}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                  selectedRegion === r.id
-                    ? 'bg-card text-foreground font-semibold shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
+        {/* Scope Pill Toggle */}
+        <div className="flex items-center gap-1.5 p-1 bg-muted/70 rounded-xl border border-border shrink-0 shadow-2xs">
+          <button
+            onClick={() => handleScopeChange('india')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              scope === 'india'
+                ? 'bg-card text-foreground shadow-xs border border-border'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span>🇮🇳</span>
+            <span>India (CPCB)</span>
+          </button>
+          <button
+            onClick={() => handleScopeChange('global')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              scope === 'global'
+                ? 'bg-primary text-primary-foreground shadow-xs font-bold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Globe2 className="w-3.5 h-3.5" />
+            <span>Rest of the World</span>
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Sub-Region Filters Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl bg-card border border-border shadow-xs">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+          <Filter className="w-3.5 h-3.5 text-primary" />
+          <span>Region Filter:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
+          {scope === 'india' ? (
+            <>
+              {[
+                { id: 'all', label: 'All India' },
+                { id: 'gangetic', label: 'Indo-Gangetic Belt' },
+                { id: 'south', label: 'Southern India' },
+                { id: 'west', label: 'Western India' },
+              ].map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedRegion(r.id)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    selectedRegion === r.id
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              {[
+                { id: 'all', label: 'All Continents' },
+                { id: 'north_america', label: 'North America (US/CA)' },
+                { id: 'europe', label: 'Europe (UK/DE/FR)' },
+                { id: 'asia_pacific', label: 'Asia-Pacific (JP/AU/SG)' },
+                { id: 'middle_east_africa', label: 'Middle East & Africa' },
+              ].map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedRegion(r.id)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    selectedRegion === r.id
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Cleanest vs Polluted Category Tabs */}
       <div className="flex border-b border-border gap-2">
         <button
           onClick={() => setActiveTab('cleanest')}
@@ -130,7 +272,7 @@ export function LeaderboardPage() {
           }`}
         >
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          Top 10 Cleanest Air Zones
+          <span>{scope === 'india' ? 'Top 10 Cleanest Indian Air Zones' : 'Top Cleanest World Stations'}</span>
         </button>
         <button
           onClick={() => setActiveTab('polluted')}
@@ -141,23 +283,29 @@ export function LeaderboardPage() {
           }`}
         >
           <AlertTriangle className="w-4 h-4 text-rose-600" />
-          Top 10 Severe Pollution Hotspots
+          <span>{scope === 'india' ? 'Top 10 Severe Indian Hotspots' : 'Highest Global Pollution Hotspots'}</span>
         </button>
       </div>
 
       {/* Leaderboard List */}
       <div className="space-y-3">
         {isLoading && (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-20 bg-muted/40 rounded-xl animate-pulse" />
-            ))}
-          </div>
+          <AirLoadingWidget
+            variant="card"
+            title={scope === 'india' ? 'Ranking Indian Monitoring Stations' : 'Indexing Global World Telemetry'}
+            subtitle="Harmonizing real-time ground observations into statutory rankings..."
+          />
         )}
 
         {!isLoading && displayList.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
-            No valid station data available for the selected region.
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-2xl border border-border space-y-2">
+            <Globe2 className="w-8 h-8 text-muted-foreground/60 mx-auto" />
+            <p className="text-sm font-semibold text-foreground">No active telemetry found for this filter</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              {scope === 'india'
+                ? 'Try selecting "All India" to view monitors nationwide.'
+                : 'Select "All Continents" to explore the worldwide international network.'}
+            </p>
           </div>
         )}
 
@@ -165,34 +313,38 @@ export function LeaderboardPage() {
           displayList.map((station, index) => {
             const color = getAQIColorHex(station.aqiCat);
             const isCleanTab = activeTab === 'cleanest';
+            const flag = COUNTRY_FLAGS[station.country?.code] || '🌐';
 
             return (
               <Card
                 key={station.openaqId}
-                className="transition-all hover:shadow-md hover:border-primary/40"
+                className="transition-all hover:shadow-md hover:border-primary/40 overflow-hidden"
               >
                 <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5 flex-1">
-                    {/* Rank Badge */}
+                    {/* Rank Badge with Medal accents */}
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-2xs ${
                         index === 0
                           ? isCleanTab
                             ? 'bg-emerald-500 text-white'
                             : 'bg-rose-500 text-white'
                           : index === 1
-                          ? 'bg-amber-100 text-amber-800'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
                           : index === 2
-                          ? 'bg-orange-100 text-orange-800'
+                          ? 'bg-orange-100 text-orange-800 border border-orange-300'
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      #{index + 1}
+                      {index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`}
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-base text-foreground leading-tight">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base" title={station.country?.name || 'Country'}>
+                          {flag}
+                        </span>
+                        <h3 className="font-bold text-base text-foreground leading-tight">
                           {station.name}
                         </h3>
                         {index === 0 && (
@@ -203,18 +355,24 @@ export function LeaderboardPage() {
                                 : 'bg-rose-100 text-rose-800'
                             }`}
                           >
-                            {isCleanTab ? 'National Clean Leader' : 'Highest National AQI'}
+                            {scope === 'india'
+                              ? isCleanTab
+                                ? 'National Clean Leader'
+                                : 'Highest National AQI'
+                              : isCleanTab
+                              ? 'Global Clean Leader'
+                              : 'Highest Global AQI'}
                           </span>
                         )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {station.locality || 'India'}
+                          <MapPin className="w-3.5 h-3.5 text-primary" />
+                          {[station.locality, station.country?.name].filter(Boolean).join(', ')}
                         </span>
                         <span>•</span>
-                        <span>{station.provider?.name || 'CPCB / SPCB'}</span>
+                        <span>{station.provider?.name || 'CPCB / Official Monitor'}</span>
                         {station.dominant && (
                           <>
                             <span>•</span>
@@ -227,13 +385,14 @@ export function LeaderboardPage() {
                     </div>
                   </div>
 
+                  {/* AQI Score & Action */}
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <div className="text-2xl font-black" style={{ color }}>
+                      <div className="text-2xl font-black font-mono tracking-tight" style={{ color }}>
                         {station.aqiVal}
                       </div>
                       <div
-                        className="text-xs font-semibold px-2 py-0.5 rounded text-white inline-block shadow-xs"
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded-md text-white inline-block shadow-xs"
                         style={{ backgroundColor: color }}
                       >
                         {station.aqiCat}
@@ -243,9 +402,9 @@ export function LeaderboardPage() {
                     <Button
                       size="sm"
                       onClick={() => handleSelectStation(station.openaqId)}
-                      className="group"
+                      className="group shadow-xs"
                     >
-                      <span>Analytics</span>
+                      <span>Explore</span>
                       <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </div>
@@ -255,13 +414,16 @@ export function LeaderboardPage() {
           })}
       </div>
 
-      <div className="p-4 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground space-y-1">
-        <p className="font-semibold text-foreground">Official Regulatory Note:</p>
+      {/* Official Footnote */}
+      <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs text-muted-foreground space-y-1">
+        <p className="font-semibold text-foreground flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          Regulatory Data Integrity Notice:
+        </p>
         <p>
-          Rankings are calculated dynamically from authentic real-time ground observations indexed via OpenAQ and processed under the CPCB 24-hour mathematical framework.
+          Rankings are calculated dynamically from authentic physical ground monitoring stations indexed via OpenAQ and calibrated under the statutory 24-hour mathematical framework. National and International data streams are independently segmented to prevent regional skew.
         </p>
       </div>
     </div>
   );
 }
-

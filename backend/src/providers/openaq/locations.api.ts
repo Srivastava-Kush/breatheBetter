@@ -170,18 +170,24 @@ export async function fetchNearbyOpenAQLocations(
   const limit = 100;
   let totalFound = Infinity;
 
+  const isWithinIndia = latitude >= 6.5 && latitude <= 37.5 && longitude >= 68.0 && longitude <= 97.5;
+  const queryParams: Record<string, string | number> = {
+    coordinates: `${latitude},${longitude}`,
+    radius: radiusMeters,
+    limit,
+    page,
+  };
+  if (isWithinIndia) {
+    queryParams['iso'] = 'IN';
+  }
+
   while (allLocations.length < totalFound && allLocations.length < maxLocations) {
     try {
+      queryParams['page'] = page;
       const response = await rateLimitedRequest<OpenAQLocationsResponse>({
         method: 'GET',
         url: '/locations',
-        params: {
-          coordinates: `${latitude},${longitude}`,
-          radius: radiusMeters,
-          iso: 'IN',
-          limit,
-          page,
-        },
+        params: queryParams,
       });
 
       const { meta, results } = response.data;

@@ -135,7 +135,11 @@ export async function getLocationsFromDB(options: {
 
   const query: Record<string, unknown> = {};
 
-  if (options.country) query['country.code'] = options.country;
+  if (options.country === 'GLOBAL_ONLY' || options.country === 'international') {
+    query['country.code'] = { $ne: 'IN' };
+  } else if (options.country) {
+    query['country.code'] = options.country;
+  }
   if (options.isMonitor !== undefined) query['isMonitor'] = options.isMonitor;
   if (options.isMobile !== undefined) query['isMobile'] = options.isMobile;
   if (options.bbox) {

@@ -19,6 +19,8 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
     const country =
       countryQuery === 'ALL' || countryQuery === 'global' || countryQuery === 'all'
         ? undefined
+        : countryQuery === 'GLOBAL_ONLY' || countryQuery === 'international'
+        ? 'GLOBAL_ONLY'
         : (countryQuery || 'IN');
     const search = req.query['search'] as string | undefined;
     const isMonitor = req.query['isMonitor'] !== undefined
