@@ -7,6 +7,53 @@ import { MockLocation } from './mockData';
  */
 export const COMPLETE_INDIA_CATALOGUE: MockLocation[] = [
   // ==========================================
+  // DELHI NCR (PRIMARY ACTIVE CPCB GROUND STATIONS)
+  // ==========================================
+  {
+    openaqId: 17,
+    name: 'R K Puram, Delhi - DPCC',
+    locality: 'South Delhi',
+    timezone: 'Asia/Kolkata',
+    country: { code: 'IN', name: 'India' },
+    owner: { id: 1, name: 'DPCC' },
+    provider: { id: 1, name: 'Delhi Pollution Control Committee' },
+    isMobile: false,
+    isMonitor: true,
+    coordinates: { latitude: 28.563262, longitude: 77.186937 },
+    sensors: [
+      { id: 12234787, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
+      { id: 12234786, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
+      { id: 12234784, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
+      { id: 12234789, name: 'so2', parameter: { id: 9, name: 'so2', units: 'µg/m³', displayName: 'SO₂' } },
+      { id: 12234782, name: 'co', parameter: { id: 8, name: 'co', units: 'mg/m³', displayName: 'CO' } },
+      { id: 12234785, name: 'o3', parameter: { id: 7, name: 'o3', units: 'µg/m³', displayName: 'O₃' } },
+    ],
+    licenses: [],
+    lastSyncedAt: new Date(),
+  },
+  {
+    openaqId: 8118,
+    name: 'Anand Vihar, Delhi - DPCC',
+    locality: 'East Delhi',
+    timezone: 'Asia/Kolkata',
+    country: { code: 'IN', name: 'India' },
+    owner: { id: 1, name: 'DPCC' },
+    provider: { id: 1, name: 'Delhi Pollution Control Committee' },
+    isMobile: false,
+    isMonitor: true,
+    coordinates: { latitude: 28.6476, longitude: 77.3158 },
+    sensors: [
+      { id: 13273800, name: 'pm25', parameter: { id: 2, name: 'pm25', units: 'µg/m³', displayName: 'PM2.5' } },
+      { id: 13273801, name: 'pm10', parameter: { id: 1, name: 'pm10', units: 'µg/m³', displayName: 'PM10' } },
+      { id: 13273802, name: 'no2', parameter: { id: 5, name: 'no2', units: 'µg/m³', displayName: 'NO₂' } },
+      { id: 13273803, name: 'so2', parameter: { id: 9, name: 'so2', units: 'µg/m³', displayName: 'SO₂' } },
+      { id: 13273804, name: 'co', parameter: { id: 8, name: 'co', units: 'mg/m³', displayName: 'CO' } },
+      { id: 13273805, name: 'o3', parameter: { id: 7, name: 'o3', units: 'µg/m³', displayName: 'O₃' } },
+    ],
+    licenses: [],
+    lastSyncedAt: new Date(),
+  },
+  // ==========================================
   // PRAYAGRAJ (ALLAHABAD), UTTAR PRADESH
   // ==========================================
   {
@@ -405,7 +452,7 @@ export const COMPLETE_INDIA_CATALOGUE: MockLocation[] = [
     lastSyncedAt: new Date(),
   },
   {
-    openaqId: 4663960,
+    openaqId: 8118,
     name: 'Anand Vihar, Delhi',
     locality: 'East Delhi',
     timezone: 'Asia/Kolkata',
@@ -446,8 +493,8 @@ export const COMPLETE_INDIA_CATALOGUE: MockLocation[] = [
     lastSyncedAt: new Date(),
   },
   {
-    openaqId: 4664152,
-    name: 'R K Puram, Delhi',
+    openaqId: 17,
+    name: 'R K Puram, Delhi - DPCC',
     locality: 'South Delhi',
     timezone: 'Asia/Kolkata',
     country: { code: 'IN', name: 'India' },

@@ -7,6 +7,7 @@ import { getAQIColorHex } from '../utils';
 interface StationMarkersLayerProps {
   locations: Location[];
   onSelectStation: (locationId: number) => void;
+  focusedStationId?: number | null;
 }
 
 /**
@@ -14,9 +15,10 @@ interface StationMarkersLayerProps {
  * Renders every regulatory ground station as an individual high-visibility tactile AQI badge.
  * Eliminates clustering so users can see real-time numeric AQI values across all cities simultaneously.
  */
-export function StationMarkersLayer({ locations, onSelectStation }: StationMarkersLayerProps) {
+export function StationMarkersLayer({ locations, onSelectStation, focusedStationId }: StationMarkersLayerProps) {
   const map = useMap();
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const markersRef = useRef<Map<number, L.Marker>>(new Map());
 
   useEffect(() => {
     if (!map) return;
@@ -41,73 +43,107 @@ export function StationMarkersLayer({ locations, onSelectStation }: StationMarke
     if (!layerGroup) return;
 
     layerGroup.clearLayers();
+    markersRef.current.clear();
 
     locations.forEach((loc) => {
       const { latitude, longitude } = loc.coordinates;
       if (!latitude || !longitude) return;
 
       const aqi = loc.latestAqi;
+      const hasAqi = aqi?.value !== undefined && aqi?.value !== null;
+      const isFocused = loc.openaqId === focusedStationId;
       const color = aqi?.category
         ? getAQIColorHex(aqi.category as AQICategory)
         : '#9ca3af';
 
-      const aqiVal = aqi?.value !== undefined && aqi?.value !== null ? `${aqi.value}` : '—';
+      const aqiVal = hasAqi ? `${aqi.value}` : '—';
       const textColor = aqi?.category === 'Moderate' ? '#111827' : '#ffffff';
 
-      // Tactile CPCB AQI Badge Marker: visible numeric score, color-coded, with downward pointer tip
-      const stationIcon = L.divIcon({
-        className: 'bb-station-marker-container',
-        html: `
-          <div class="bb-station-pin group" style="
-            background-color: ${color};
-            color: ${textColor};
-            border: 2px solid #ffffff;
-            border-radius: 9999px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-            min-width: 44px;
-            height: 28px;
-            padding: 0 7px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            cursor: pointer;
-            position: relative;
-            user-select: none;
-            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease-out;
-          ">
-            <span>${aqiVal}</span>
-            <div style="
-              position: absolute;
-              bottom: -5px;
-              left: 50%;
-              transform: translateX(-50%);
-              width: 0;
-              height: 0;
-              border-left: 5px solid transparent;
-              border-right: 5px solid transparent;
-              border-top: 5px solid ${color};
-            "></div>
-          </div>
-        `,
-        iconSize: [44, 32],
-        iconAnchor: [22, 32],
-        popupAnchor: [0, -32],
-      });
+      // Tactile CPCB AQI Badge Marker for stations with valid AQI; subtle discrete dot for calibrating/offline stations
+      const stationIcon = hasAqi
+        ? L.divIcon({
+            className: `bb-station-marker-container ${isFocused ? 'bb-marker-focused' : ''}`,
+            html: `
+              <div class="bb-station-pin group" style="
+                background-color: ${color};
+                color: ${textColor};
+                border: ${isFocused ? '3px solid #10b981' : '2px solid #ffffff'};
+                border-radius: 9999px;
+                box-shadow: ${
+                  isFocused
+                    ? '0 0 0 6px rgba(16, 185, 129, 0.5), 0 0 25px rgba(16, 185, 129, 0.9), 0 4px 18px rgba(0, 0, 0, 0.45)'
+                    : '0 4px 14px rgba(0, 0, 0, 0.35)'
+                };
+                min-width: 44px;
+                height: 28px;
+                padding: 0 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                cursor: pointer;
+                position: relative;
+                user-select: none;
+                transform: ${isFocused ? 'scale(1.35)' : 'scale(1)'};
+                transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease-out;
+                z-index: ${isFocused ? '25000' : '1'};
+              ">
+                <span>${aqiVal}</span>
+                <div style="
+                  position: absolute;
+                  bottom: -5px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  width: 0;
+                  height: 0;
+                  border-left: 5px solid transparent;
+                  border-right: 5px solid transparent;
+                  border-top: 5px solid ${isFocused ? '#10b981' : color};
+                "></div>
+              </div>
+            `,
+            iconSize: [44, 32],
+            iconAnchor: [22, 32],
+            popupAnchor: [0, -32],
+          })
+        : L.divIcon({
+            className: `bb-station-dot-container ${isFocused ? 'bb-dot-focused' : ''}`,
+            html: `
+              <div class="bb-station-dot group" style="
+                background-color: ${isFocused ? '#10b981' : '#94a3b8'};
+                border: 2px solid #ffffff;
+                border-radius: 9999px;
+                box-shadow: ${
+                  isFocused
+                    ? '0 0 0 5px rgba(16, 185, 129, 0.55), 0 0 18px rgba(16, 185, 129, 0.85)'
+                    : '0 1px 4px rgba(0, 0, 0, 0.3)'
+                };
+                width: ${isFocused ? '16px' : '10px'};
+                height: ${isFocused ? '16px' : '10px'};
+                cursor: pointer;
+                transform: ${isFocused ? 'scale(1.3)' : 'scale(1)'};
+                transition: transform 0.2s ease-out;
+              " title="${loc.name} ${isFocused ? '(Focused)' : '(Awaiting telemetry cycle)'}"></div>
+            `,
+            iconSize: isFocused ? [16, 16] : [10, 10],
+            iconAnchor: isFocused ? [8, 8] : [5, 5],
+            popupAnchor: [0, -8],
+          });
 
       const marker = L.marker([latitude, longitude], {
         icon: stationIcon,
         riseOnHover: true,
+        zIndexOffset: isFocused ? 25000 : 0,
       });
 
       // Hover elevation: bring hovered marker above nearby overlapping pins in dense metros
       marker.on('mouseover', () => {
-        marker.setZIndexOffset(10000);
+        marker.setZIndexOffset(30000);
       });
       marker.on('mouseout', () => {
-        marker.setZIndexOffset(0);
+        marker.setZIndexOffset(isFocused ? 25000 : 0);
       });
 
       const isProjected = (aqi as any)?.isProjected;
@@ -146,7 +182,10 @@ export function StationMarkersLayer({ locations, onSelectStation }: StationMarke
             <div class="text-[10px] text-gray-400 italic">${isProjected ? 'ML Diurnal & Dispersion Projection' : 'CPCB Sub-Index Methodology'}</div>
           </div>
         `
-            : `<div class="text-xs text-gray-400 italic p-1">AQI unavailable — insufficient valid pollutant data</div>`
+            : `<div class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs">
+                 <div class="font-bold flex items-center gap-1 text-[11px]">⚠️ Sensor Offline / Calibrating</div>
+                 <div class="text-[10px] text-amber-700 mt-0.5">Live ground telemetry awaiting next station observation cycle.</div>
+               </div>`
         }
         <div class="text-[10px] text-gray-400 font-mono">
           ${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E
@@ -164,8 +203,19 @@ export function StationMarkersLayer({ locations, onSelectStation }: StationMarke
 
       marker.bindPopup(popupContent, { maxWidth: 280 });
       layerGroup.addLayer(marker);
+      markersRef.current.set(loc.openaqId, marker);
     });
-  }, [locations, onSelectStation]);
+  }, [locations, onSelectStation, focusedStationId]);
+
+  // Automatically pop open popup and elevate marker when a station is focused
+  useEffect(() => {
+    if (!focusedStationId) return;
+    const marker = markersRef.current.get(focusedStationId);
+    if (marker) {
+      marker.setZIndexOffset(35000);
+      marker.openPopup();
+    }
+  }, [focusedStationId]);
 
   return null;
 }

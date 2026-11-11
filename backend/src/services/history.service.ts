@@ -3,7 +3,6 @@ import { Location } from '../models/Location';
 import { fetchAllSensorHours } from '../providers/openaq/history.api';
 import { normalizeHourlyRecord } from './normalization.service';
 import { isDbConnected } from '../config/database';
-import { generateMockObservations } from '../mock/mockData';
 import { logger } from '../utils/logger';
 import { normalizePollutantName } from '../utils/pollutant-map';
 
@@ -21,39 +20,69 @@ export async function getLocationHistory(
   const from = new Date(now.getTime() - hours * 60 * 60 * 1000);
 
   if (!isDbConnected) {
-    const mockHist = generateMockObservations(locationId).history;
-    let filtered = mockHist.filter((h) => new Date(h.measurementUtc) >= from);
-    if (options.pollutant) {
-      const normalized = normalizePollutantName(options.pollutant);
-      if (normalized) filtered = filtered.filter((h) => h.pollutant === normalized);
-    }
-    return filtered;
+    return [];
   }
 
   const query: Record<string, unknown> = {
     locationId,
-    measurementType: 'hourly_average',
     measurementUtc: { $gte: from, $lte: now },
   };
 
-  if (options.pollutant) {
-    const normalized = normalizePollutantName(options.pollutant);
-    if (normalized) query['pollutant'] = normalized;
+  const targetPollutant = options.pollutant ? normalizePollutantName(options.pollutant) : null;
+  if (targetPollutant) {
+    query['pollutant'] = targetPollutant;
   }
 
-  const results = await Observation.find(query)
+  let results = await Observation.find(query)
     .sort({ measurementUtc: 1 })
-    .select({ pollutant: 1, value: 1, unit: 1, measurementUtc: 1, freshnessStatus: 1 })
+    .select({ pollutant: 1, value: 1, unit: 1, measurementUtc: 1, freshnessStatus: 1, sensorId: 1 })
     .lean();
 
-  if (results.length === 0) {
-    const mockHist = generateMockObservations(locationId).history;
-    let filtered = mockHist.filter((h) => new Date(h.measurementUtc) >= from);
-    if (options.pollutant) {
-      const normalized = normalizePollutantName(options.pollutant);
-      if (normalized) filtered = filtered.filter((h) => h.pollutant === normalized);
+  // If we have sparse or insufficient historical observations:
+  // For single pollutant over 24h, expect >= 6; over 168h, >= 24.
+  // For all pollutants combined (diurnal matrix), expect >= 36 points.
+  const expectedThreshold = targetPollutant
+    ? Math.min(24, Math.max(6, Math.floor(hours / 6)))
+    : Math.min(72, Math.max(18, Math.floor(hours / 2)));
+
+  if (results.length < expectedThreshold) {
+    try {
+      const location = await Location.findOne({ openaqId: locationId });
+      if (location && location.sensors && location.sensors.length > 0) {
+        // Group available sensors by criteria pollutant and pick the most recent (highest ID) sensor
+        const sensorsByParam = new Map<string, any>();
+        for (const s of location.sensors) {
+          const p = normalizePollutantName(s.parameter.name);
+          if (!p) continue;
+          if (targetPollutant && p !== targetPollutant) continue;
+
+          const existing = sensorsByParam.get(p);
+          if (!existing || s.id > existing.id) {
+            sensorsByParam.set(p, s);
+          }
+        }
+
+        const targetSensors = Array.from(sensorsByParam.values());
+
+        for (const sensor of targetSensors) {
+          await syncSensorHistory(
+            sensor.id,
+            locationId,
+            location.name,
+            location.coordinates,
+            from.toISOString(),
+            now.toISOString()
+          );
+        }
+
+        results = await Observation.find(query)
+          .sort({ measurementUtc: 1 })
+          .select({ pollutant: 1, value: 1, unit: 1, measurementUtc: 1, freshnessStatus: 1, sensorId: 1 })
+          .lean();
+      }
+    } catch (err) {
+      logger.debug(`Historical sync attempt failed for location ${locationId}:`, err);
     }
-    return filtered;
   }
 
   return results;
@@ -83,10 +112,11 @@ export async function syncSensorHistory(
   }
 
   const records = await fetchAllSensorHours(sensorId, datetimeFrom, datetimeTo);
-  logger.info(`Fetched ${records.length} hourly records for sensor ${sensorId}`);
+  logger.info(`Fetched ${records.length} hourly records for sensor ${sensorId} (${sensor.parameter?.name})`);
 
   let saved = 0;
   let skipped = 0;
+  const bulkOps: any[] = [];
 
   for (const record of records) {
     const normalized = normalizeHourlyRecord(
@@ -97,30 +127,36 @@ export async function syncSensorHistory(
       sensor,
       coordinates
     );
-    if (!normalized) {
+    if (!normalized || normalized.value == null || isNaN(normalized.value) || normalized.value < 0) {
       skipped++;
       continue;
     }
 
-    try {
-      await Observation.findOneAndUpdate(
-        {
+    bulkOps.push({
+      updateOne: {
+        filter: {
           sensorId: normalized.sensorId,
           measurementUtc: new Date(normalized.measurementUtc),
           measurementType: 'hourly_average',
         },
-        { $set: { ...normalized, measurementUtc: new Date(normalized.measurementUtc) } },
-        { upsert: true }
-      );
-      saved++;
+        update: {
+          $set: {
+            ...normalized,
+            fetchedAt: new Date(normalized.fetchedAt),
+            measurementUtc: new Date(normalized.measurementUtc),
+          },
+        },
+        upsert: true,
+      },
+    });
+  }
+
+  if (bulkOps.length > 0) {
+    try {
+      const res = await Observation.bulkWrite(bulkOps, { ordered: false });
+      saved = (res.upsertedCount || 0) + (res.modifiedCount || 0);
     } catch (err: unknown) {
-      const e = err as { code?: number };
-      if (e.code === 11000) {
-        skipped++;
-      } else {
-        logger.error(`Failed to save hourly record for sensor ${sensorId}:`, err);
-        skipped++;
-      }
+      logger.error(`Failed to bulk save hourly records for sensor ${sensorId}:`, err);
     }
   }
 

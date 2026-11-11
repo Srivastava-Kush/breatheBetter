@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { AirLoadingWidget } from '../components/AirLoadingWidget';
 import { getAQIColorHex, formatDateTime } from '../utils';
 import type { AQICategory, Location } from '../types';
 
@@ -233,11 +234,11 @@ export function CleanAirPage() {
         </div>
 
         {isLoading && (
-          <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted/40 rounded-xl animate-pulse" />
-            ))}
-          </div>
+          <AirLoadingWidget
+            variant="card"
+            title="Scanning India Clean Air Stations"
+            subtitle="Comparing nearby ground monitors to identify optimal clean air zones..."
+          />
         )}
 
         {!isLoading && stationsInRadius.length === 0 && (

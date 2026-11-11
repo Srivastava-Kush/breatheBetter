@@ -4,35 +4,45 @@ import { Location } from '../models/Location';
 import { updateLatestReadings } from '../services/aqi.service';
 import { logger } from '../utils/logger';
 
-const CONCURRENCY = 3; // max 3 simultaneous location updates (rate-limit aware)
+const CONCURRENCY = 1; // 1 sequential location update to respect 60 req/min rate limit cleanly
 
-// Update latest readings every 30 minutes
+async function runUpdateBatch(batchSize = 25): Promise<void> {
+  try {
+    const locations = await Location.find({ isMobile: false })
+      .sort({ lastSyncedAt: 1 })
+      .limit(batchSize)
+      .select({ openaqId: 1 });
+
+    const limit = pLimit(CONCURRENCY);
+    const tasks = locations.map((loc) =>
+      limit(async () => {
+        try {
+          await updateLatestReadings(loc.openaqId);
+        } catch (err) {
+          logger.debug(`Station ${loc.openaqId} update:`, err);
+        }
+      })
+    );
+
+    await Promise.all(tasks);
+    logger.info(`✅ Latest readings updated for ${locations.length} locations`);
+  } catch (err) {
+    logger.error('Latest readings update failed:', err);
+  }
+}
+
+// Update latest readings every 5 minutes and run immediate startup batch
 export function startLatestReadingsJob(): void {
-  logger.info('📅 Latest readings job registered (every 30 minutes)');
+  logger.info('📅 Latest readings job registered (every 5 minutes)');
 
-  cron.schedule('*/30 * * * *', async () => {
-    logger.info('🔄 Running latest readings update...');
-    try {
-      // Only update non-mobile, monitoring stations (prioritize them)
-      const locations = await Location.find({ isMobile: false })
-        .sort({ lastSyncedAt: 1 })
-        .limit(50)
-        .select({ openaqId: 1 });
+  // Run initial batch shortly after startup
+  setTimeout(() => {
+    runUpdateBatch(20).catch((err) => logger.debug('Initial readings sync error:', err));
+  }, 4000);
 
-      const limit = pLimit(CONCURRENCY);
-      const tasks = locations.map((loc) =>
-        limit(() =>
-          updateLatestReadings(loc.openaqId).catch((err) =>
-            logger.error(`Failed to update location ${loc.openaqId}:`, err)
-          )
-        )
-      );
-
-      await Promise.all(tasks);
-      logger.info(`✅ Latest readings updated for ${locations.length} locations`);
-    } catch (err) {
-      logger.error('Latest readings job failed:', err);
-    }
+  cron.schedule('*/5 * * * *', async () => {
+    logger.info('🔄 Running scheduled latest readings update...');
+    await runUpdateBatch(25);
   });
 }
 

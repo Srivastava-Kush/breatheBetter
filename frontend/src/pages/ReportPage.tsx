@@ -13,17 +13,19 @@ import {
   MapPin,
 } from 'lucide-react';
 import { useImpactReport, useLocations } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
 export function ReportPage() {
   const { selectedLocationId, setSelectedLocation } = useAppStore();
   const [reportDays, setReportDays] = useState<number>(30);
-  const { data: locationsData } = useLocations({ limit: 100 });
+  const { data: locationsData } = useLocations({ limit: 1000 });
   const stations = locationsData?.data ?? [];
 
-  const locationId = selectedLocationId ?? (stations[0]?.openaqId || 4664101);
+  const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId))
+    ? selectedLocationId
+    : (stations[0]?.openaqId || 17);
 
   const { data: reportRes, isLoading, error } = useImpactReport(locationId, reportDays);
   const report = reportRes?.data;
@@ -46,7 +48,24 @@ export function ReportPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Station Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-card border border-border px-2.5 py-1.5 rounded-lg text-xs shadow-2xs">
+            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+            <select
+              value={locationId}
+              onChange={(e) => setSelectedLocation(Number(e.target.value))}
+              aria-label="Select monitoring station for impact report"
+              className="bg-transparent text-foreground text-xs font-medium focus:outline-hidden cursor-pointer max-w-[240px] truncate"
+            >
+              {stations.map((st) => (
+                <option key={st.openaqId} value={st.openaqId} className="bg-card text-foreground">
+                  {st.name} {st.locality ? `(${st.locality})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Days selector */}
           <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border text-xs">
             {[7, 30, 90].map((d) => (

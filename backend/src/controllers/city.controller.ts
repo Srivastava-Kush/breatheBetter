@@ -3,6 +3,7 @@ import { searchCities } from '../providers/openmeteo/geocoding.api';
 import { fetchCurrentModelledAirQuality } from '../providers/openmeteo/forecast.api';
 import { getNearbyLocations } from '../services/location.service';
 import { getLatestAQI } from '../services/aqi.service';
+import { apiCache } from '../utils/cache';
 import { logger } from '../utils/logger';
 
 /**
@@ -22,12 +23,22 @@ export async function searchCitiesHandler(req: Request, res: Response): Promise<
       return;
     }
 
+    const cacheKey = `city_search:${countryCode}:${query.toLowerCase().trim()}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const cities = await searchCities(query, countryCode, 10);
-    res.json({
+    const payload = {
       success: true,
       meta: { count: cities.length, query },
       data: cities,
-    });
+    };
+
+    apiCache.set(cacheKey, payload, 1800); // 30 min TTL
+    res.json(payload);
   } catch (error) {
     logger.error('City search failed:', error);
     res.status(500).json({ success: false, error: 'Failed to search cities' });
@@ -55,6 +66,13 @@ export async function getCityAirQualityHandler(req: Request, res: Response): Pro
         success: false,
         error: 'Valid lat and lng query parameters are required',
       });
+      return;
+    }
+
+    const cacheKey = `city_aq:${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json(cached);
       return;
     }
 
@@ -193,8 +211,7 @@ export async function getCityAirQualityHandler(req: Request, res: Response): Pro
       }
     }
 
-    res.json({
-      success: true,
+    const resultData = {
       city: {
         name: cityName,
         state: stateName || null,
@@ -212,7 +229,15 @@ export async function getCityAirQualityHandler(req: Request, res: Response): Pro
       noStationMessage,
       nearestAlternativeStations,
       modelledFallback,
-    });
+    };
+
+    const payload = {
+      success: true,
+      data: resultData,
+    };
+
+    apiCache.set(cacheKey, payload, 300); // 5 min TTL
+    res.json(payload);
   } catch (error) {
     logger.error('getCityAirQuality error:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve city air quality' });

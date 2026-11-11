@@ -6,7 +6,9 @@ import {
   searchLocations,
   syncIndianLocations,
 } from '../services/location.service';
-import { getLatestAQI } from '../services/aqi.service';
+import { AQISnapshot } from '../models/AQISnapshot';
+import { isDbConnected } from '../config/database';
+import { apiCache } from '../utils/cache';
 import { logger } from '../utils/logger';
 
 export async function listLocations(req: Request, res: Response): Promise<void> {
@@ -34,6 +36,13 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
       }
     }
 
+    const cacheKey = `locations:${country || 'all'}:${limit}:${skip}:${search || ''}:${req.query['bbox'] || ''}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const { locations, total } = await getLocationsFromDB({
       limit,
       skip,
@@ -44,31 +53,42 @@ export async function listLocations(req: Request, res: Response): Promise<void> 
       bbox,
     });
 
-    const locationsWithAqi = await Promise.all(
-      locations.map(async (loc: any) => {
-        try {
-          const aqiSnap = await getLatestAQI(loc.openaqId);
-          const raw = typeof loc.toObject === 'function' ? loc.toObject() : loc;
-          return {
-            ...raw,
-            latestAqi: aqiSnap && aqiSnap.isValid ? {
-              value: aqiSnap.aqi,
-              category: aqiSnap.category,
-              dominantPollutant: aqiSnap.dominantPollutant,
-            } : null,
-          };
-        } catch {
-          const raw = typeof loc.toObject === 'function' ? loc.toObject() : loc;
-          return raw;
-        }
-      })
-    );
+    // Batch lookup AQI snapshots in a single DB query
+    const locIds = locations.map((l: any) => l.openaqId);
+    const snapshotMap = new Map<number, any>();
 
-    res.json({
+    if (isDbConnected && locIds.length > 0) {
+      const snapshots = await AQISnapshot.find({ locationId: { $in: locIds } })
+        .sort({ calculatedAt: -1 })
+        .lean();
+      for (const s of snapshots) {
+        if (!snapshotMap.has(s.locationId)) {
+          snapshotMap.set(s.locationId, s);
+        }
+      }
+    }
+
+    const locationsWithAqi = locations.map((loc: any) => {
+      const raw = typeof loc.toObject === 'function' ? loc.toObject() : loc;
+      const aqiSnap = snapshotMap.get(loc.openaqId);
+      return {
+        ...raw,
+        latestAqi: aqiSnap && aqiSnap.isValid ? {
+          value: aqiSnap.aqi,
+          category: aqiSnap.category,
+          dominantPollutant: aqiSnap.dominantPollutant,
+        } : null,
+      };
+    });
+
+    const payload = {
       success: true,
       meta: { total, limit, skip },
       data: locationsWithAqi,
-    });
+    };
+
+    apiCache.set(cacheKey, payload, 300); // 5 min TTL
+    res.json(payload);
   } catch (error) {
     logger.error('listLocations error:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve locations' });
@@ -83,13 +103,22 @@ export async function getLocation(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const cacheKey = `loc:${locationId}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const location = await getLocationById(locationId);
     if (!location) {
       res.status(404).json({ success: false, error: 'Location not found' });
       return;
     }
 
-    res.json({ success: true, data: location });
+    const payload = { success: true, data: location };
+    apiCache.set(cacheKey, payload, 600);
+    res.json(payload);
   } catch (error) {
     logger.error('getLocation error:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve location' });
@@ -135,7 +164,7 @@ export async function searchLocationsController(req: Request, res: Response): Pr
 export async function triggerLocationSync(req: Request, res: Response): Promise<void> {
   try {
     logger.info('Manual location sync triggered via API');
-    // Run async, return immediately
+    apiCache.flush();
     syncIndianLocations().catch((err) => logger.error('Background sync error:', err));
     res.json({ success: true, message: 'Location sync started in background' });
   } catch (error) {

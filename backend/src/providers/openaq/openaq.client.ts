@@ -76,11 +76,15 @@ export async function openaqRequest<T>(
       return openaqRequest<T>(config, attempt + 1);
     }
 
-    logger.error(`OpenAQ request failed permanently after ${attempt} attempt(s):`, {
-      url: config.url,
-      status,
-      message: axiosError.message,
-    });
+    if (status === 404) {
+      logger.warn(`OpenAQ resource not found (404): ${config.url}`);
+    } else {
+      logger.error(`OpenAQ request failed permanently after ${attempt} attempt(s):`, {
+        url: config.url,
+        status,
+        message: axiosError.message,
+      });
+    }
     throw error;
   }
 }

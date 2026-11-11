@@ -293,7 +293,8 @@ const MIN_REQUIRED_DATA_COMPLETENESS = 16; // of 24 hourly readings
 export function calculateCPCBAQI(
   pollutantData: Partial<
     Record<AQIPollutant, { value: number; unit: string; dataPointsUsed: number }>
-  >
+  >,
+  options: { allowInstantaneous?: boolean } = {}
 ): AQIResult {
   const subIndices: PollutantSubIndex[] = [];
 
@@ -304,9 +305,11 @@ export function calculateCPCBAQI(
     if (!data) continue;
 
     const avgPeriod = POLLUTANT_AVERAGING_PERIOD[pollutant];
-    const requiredPoints = pollutant === 'co' || pollutant === 'o3'
+    const standardRequired = pollutant === 'co' || pollutant === 'o3'
       ? Math.ceil(MIN_REQUIRED_DATA_COMPLETENESS * (avgPeriod / 24))
       : MIN_REQUIRED_DATA_COMPLETENESS;
+
+    const requiredPoints = options.allowInstantaneous ? 1 : standardRequired;
 
     const subIndex = calculateSubIndex(
       pollutant,
@@ -325,7 +328,9 @@ export function calculateCPCBAQI(
     validSubIndices.some((s) => s.pollutant === 'pm25') ||
     validSubIndices.some((s) => s.pollutant === 'pm10');
 
-  if (validSubIndices.length < MIN_REQUIRED_SUBINDICES || !hasParticulateMatter) {
+  const minSubIndices = options.allowInstantaneous ? 1 : MIN_REQUIRED_SUBINDICES;
+
+  if (validSubIndices.length < minSubIndices || !hasParticulateMatter) {
     const reason = !hasParticulateMatter
       ? 'PM2.5 or PM10 measurement required for AQI calculation'
       : `Only ${validSubIndices.length} valid sub-indices (minimum ${MIN_REQUIRED_SUBINDICES} required)`;
@@ -355,7 +360,9 @@ export function calculateCPCBAQI(
     isValid: true,
     invalidReason: null,
     calculationStandard: 'CPCB',
-    displayLabel: 'BreatheBetter AQI — Calculated using CPCB methodology',
+    displayLabel: options.allowInstantaneous && validSubIndices.length < MIN_REQUIRED_SUBINDICES
+      ? 'BreatheBetter Real-Time AQI — CPCB sub-index'
+      : 'BreatheBetter AQI — Calculated using CPCB methodology',
   };
 }
 

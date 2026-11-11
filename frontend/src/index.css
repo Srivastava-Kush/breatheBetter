@@ -134,3 +134,81 @@ body {
   }
 }
 
+/* Atmospheric Breathing Loading Animations */
+@keyframes air-breathe-pulse {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes air-aura-expand {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes air-orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes air-orbit-spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes air-wave-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-air-breathe {
+  animation: air-breathe-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-air-aura {
+  animation: air-aura-expand 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.animate-air-orbit {
+  animation: air-orbit-spin 12s linear infinite;
+}
+
+.animate-air-orbit-fast {
+  animation: air-orbit-spin 6s linear infinite;
+}
+
+.animate-air-orbit-reverse {
+  animation: air-orbit-spin-reverse 10s linear infinite;
+}
+
+.animate-air-wave {
+  animation: air-wave-slide 1.8s ease-in-out infinite;
+}
+

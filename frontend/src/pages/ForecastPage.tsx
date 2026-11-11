@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CloudSun, AlertCircle, Info, Cpu, Sparkles, Wind, Droplets, Gauge, ArrowRight } from 'lucide-react';
 import { useForecast, useMLPrediction } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { POLLUTANT_DISPLAY, type AQICategory } from '../types';
 import { getAQIColorHex } from '../utils';
@@ -20,11 +20,12 @@ import {
 
 export function ForecastPage() {
   const { selectedLocationId } = useAppStore();
+  const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : 17;
   const [activeTab, setActiveTab] = useState<'openmeteo' | 'ml'>('ml');
   const [selectedPollutant, setSelectedPollutant] = useState('pm25');
 
-  const { data: forecastData, isLoading: forecastLoading } = useForecast(selectedLocationId);
-  const { data: mlData, isLoading: mlLoading } = useMLPrediction(selectedLocationId);
+  const { data: forecastData, isLoading: forecastLoading } = useForecast(locationId);
+  const { data: mlData, isLoading: mlLoading } = useMLPrediction(locationId);
 
   const forecast = forecastData?.data;
   const hours = forecast?.hours ?? [];

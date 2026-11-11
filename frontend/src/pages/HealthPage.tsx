@@ -1,7 +1,7 @@
 import React from 'react';
 import { Heart, AlertCircle, Info } from 'lucide-react';
 import { useDashboard } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { AQIGauge } from '../components/AQIGauge';
 import type { AQICategory } from '../types';
@@ -18,7 +18,8 @@ const HEALTH_ICONS: Record<string, string> = {
 
 export function HealthPage() {
   const { selectedLocationId } = useAppStore();
-  const { data, isLoading } = useDashboard(selectedLocationId ?? 0);
+  const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : 17;
+  const { data, isLoading } = useDashboard(locationId);
 
   const dashboard = data?.data;
   const aqi = dashboard?.aqi;

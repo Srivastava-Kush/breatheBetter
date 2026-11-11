@@ -70,14 +70,26 @@ export async function getLocationById(locationId: number): Promise<ILocation | a
     return found ?? MOCK_LOCATIONS[0];
   }
 
-  let location: ILocation | null = (await Location.findOne({ openaqId: locationId })) as ILocation | null;
+  let location: ILocation | null = null;
+  try {
+    location = (await Location.findOne({ openaqId: locationId })) as ILocation | null;
+  } catch (err) {
+    logger.debug(`DB lookup failed for location ${locationId}`);
+  }
+
   if (!location) {
     // Try fetching from OpenAQ if not in DB
-    const raw = await fetchLocationById(locationId);
-    if (raw) {
-      location = await upsertLocation(raw);
-    } else {
-      // Fallback to mock if available
+    try {
+      const raw = await fetchLocationById(locationId);
+      if (raw) {
+        location = await upsertLocation(raw);
+      }
+    } catch {
+      // Station not found on upstream OpenAQ or network error
+    }
+
+    if (!location) {
+      // Fallback to local catalogue
       const found = MOCK_LOCATIONS.find((l) => l.openaqId === locationId);
       if (found) return found;
     }
@@ -161,7 +173,7 @@ export async function getLocationsFromDB(options: {
 export async function getNearbyLocations(
   latitude: number,
   longitude: number,
-  radiusKm = 25,
+  radiusKm = 50,
   limit = 20
 ): Promise<any[]> {
   // 1. Try DB first if connected
@@ -178,7 +190,7 @@ export async function getNearbyLocations(
         $gte: longitude - lngDelta,
         $lte: longitude + lngDelta,
       },
-    }).limit(100);
+    }).limit(200);
 
     if (candidates.length > 0) {
       const filtered = filterWithinRadius(
@@ -188,7 +200,11 @@ export async function getNearbyLocations(
         radiusKm
       );
       if (filtered.length > 0) {
-        return filtered.slice(0, limit);
+        return filtered.map((item) => ({
+          ...item,
+          id: item.openaqId,
+          openaqId: item.openaqId,
+        })).slice(0, limit);
       }
     }
   }
@@ -199,6 +215,7 @@ export async function getNearbyLocations(
     if (liveNearby && liveNearby.length > 0) {
       const mapped = liveNearby.map((loc) => ({
         ...loc,
+        id: loc.id,
         openaqId: loc.id,
         distanceKm: Math.round(
           haversineDistanceKm(latitude, longitude, loc.coordinates.latitude, loc.coordinates.longitude) * 10
@@ -207,12 +224,33 @@ export async function getNearbyLocations(
       return mapped.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0)).slice(0, limit);
     }
   } catch (err) {
-    logger.warn('OpenAQ live nearby discovery failed, falling back to catalogue:', err);
+    logger.warn('OpenAQ live nearby discovery failed, falling back to database scan:', err);
   }
 
-  // 3. Fallback to comprehensive in-memory catalogue with real Haversine distance
-  const catalogueFiltered = filterWithinRadius(MOCK_LOCATIONS, latitude, longitude, radiusKm);
-  return catalogueFiltered.slice(0, limit);
+  // 3. Fallback: Find closest stations anywhere in DB by calculating distance to all stations
+  if (isDbConnected) {
+    const all = await Location.find({}).limit(500).lean();
+    if (all.length > 0) {
+      const sorted = all
+        .filter((loc) => loc.coordinates?.latitude && loc.coordinates?.longitude)
+        .map((loc) => ({
+          ...loc,
+          id: loc.openaqId,
+          openaqId: loc.openaqId,
+          distanceKm: haversineDistanceKm(latitude, longitude, loc.coordinates.latitude, loc.coordinates.longitude),
+        }))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+      return sorted.slice(0, limit);
+    }
+  }
+
+  // 4. Fallback to comprehensive in-memory catalogue
+  const catalogueFiltered = filterWithinRadius(MOCK_LOCATIONS, latitude, longitude, radiusKm * 2);
+  return catalogueFiltered.map((item) => ({
+    ...item,
+    id: item.openaqId,
+    openaqId: item.openaqId,
+  })).slice(0, limit);
 }
 
 export async function searchLocations(query: string): Promise<any[]> {

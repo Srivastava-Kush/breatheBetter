@@ -1,4 +1,5 @@
 import { rateLimitedRequest } from './openaq.client';
+import { apiCache } from '../../utils/cache';
 import { logger } from '../../utils/logger';
 
 export interface OpenAQSensor {
@@ -75,40 +76,61 @@ export async function fetchIndianLocations(options: {
 }
 
 /**
- * Fetch ALL Indian locations with full pagination.
+ * Fetch Indian locations with pagination.
  */
-export async function fetchAllIndianLocations(): Promise<OpenAQLocation[]> {
+export async function fetchAllIndianLocations(maxPages = 10): Promise<OpenAQLocation[]> {
   const allLocations: OpenAQLocation[] = [];
   let page = 1;
   const limit = 100;
-  let totalFound = Infinity;
 
-  while (allLocations.length < totalFound) {
-    logger.info(`Fetching Indian locations page ${page}...`);
-    const { meta, results } = await fetchIndianLocations({ limit, page });
-    totalFound = meta.found;
+  while (page <= maxPages) {
+    try {
+      logger.info(`Fetching Indian locations page ${page}...`);
+      const { meta, results } = await fetchIndianLocations({ limit, page });
+      if (!results || results.length === 0) break;
 
-    if (results.length === 0) break;
-    allLocations.push(...results);
+      allLocations.push(...results);
+      logger.info(`Fetched ${allLocations.length} locations so far from OpenAQ`);
 
-    logger.info(`Fetched ${allLocations.length} / ${totalFound} locations`);
+      if (results.length < limit) break;
 
-    if (allLocations.length >= totalFound) break;
-    page++;
+      const foundStr = String(meta?.found ?? '');
+      if (!foundStr.includes('>')) {
+        const numericFound = typeof meta?.found === 'number'
+          ? meta.found
+          : parseInt(foundStr.replace(/\D/g, ''), 10) || Infinity;
+
+        if (allLocations.length >= numericFound) break;
+      }
+      page++;
+    } catch (err) {
+      logger.error(`Error fetching Indian locations page ${page}:`, err);
+      break;
+    }
   }
 
   return allLocations;
 }
 
 export async function fetchLocationById(locationId: number): Promise<OpenAQLocation | null> {
+  const notFoundKey = `loc_not_found:${locationId}`;
+  if (apiCache.get<boolean>(notFoundKey)) {
+    return null;
+  }
+
   try {
     const response = await rateLimitedRequest<{ results: OpenAQLocation[] }>({
       method: 'GET',
       url: `/locations/${locationId}`,
     });
     return response.data.results[0] ?? null;
-  } catch (error) {
-    logger.error(`Failed to fetch location ${locationId}:`, error);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      apiCache.set(notFoundKey, true, 600); // cache negative result for 10 min
+      logger.debug(`Station ${locationId} not found on OpenAQ (404)`);
+    } else {
+      logger.error(`Failed to fetch location ${locationId}:`, error?.message || error);
+    }
     return null;
   }
 }

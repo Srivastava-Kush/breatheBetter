@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Wind,
   AlertCircle,
@@ -18,9 +18,11 @@ import {
   Activity,
   Smile,
   AlertTriangle,
+  Navigation,
 } from 'lucide-react';
 import { useDashboard, useHistory, useAlerts, useWeather } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { locationsApi } from '../api/endpoints';
+import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
 import { AQIGauge } from '../components/AQIGauge';
 import { AqiVisualFigure, getAqiFigureDetails } from '../components/AqiVisualFigure';
 import { PollutantCard } from '../components/ui/PollutantCard';
@@ -30,6 +32,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AQIShareCard } from '../components/AQIShareCard';
 import { InsightsCard } from '../components/InsightsCard';
+import { AirLoadingWidget } from '../components/AirLoadingWidget';
 import { formatDateTime, getAQIColorHex } from '../utils';
 import type { PollutantReading, AQICategory } from '../types';
 import {
@@ -42,7 +45,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-const DEFAULT_LOCATION_ID = 4663956; // Santushti Apartments, Vasant Kunj — fallback for demo
+const DEFAULT_LOCATION_ID = 17; // R K Puram, Delhi - DPCC (Active CPCB ground station)
 
 function getCategoryAtmosphereStyle(category: string | undefined) {
   switch (category) {
@@ -168,8 +171,114 @@ function HistoryAreaChart({ locationId }: { locationId: number }) {
 }
 
 export function OverviewPage() {
-  const { selectedLocationId, recentLocations } = useAppStore();
-  const locationId = selectedLocationId ?? DEFAULT_LOCATION_ID;
+  const { selectedLocationId, setSelectedLocation, addRecentLocation, recentLocations } = useAppStore();
+  const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : DEFAULT_LOCATION_ID;
+
+  const [isInitialBoot, setIsInitialBoot] = useState<boolean>(() => {
+    return !sessionStorage.getItem('bb_initial_boot_done');
+  });
+  const [bootStatus, setBootStatus] = useState<string>('Detecting your location and nearest CPCB ground station...');
+  const [detectedStation, setDetectedStation] = useState<string | null>(null);
+
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+
+  const handleLocateMe = (isBoot: boolean | unknown = false) => {
+    const bootMode = isBoot === true;
+    if (!navigator.geolocation) {
+      if (!bootMode) setLocateError('Geolocation is not supported by your browser.');
+      return;
+    }
+    if (!bootMode) {
+      setLocating(true);
+      setLocateError(null);
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (bootMode) {
+            setBootStatus('Scanning 775 official Indian ground stations for closest monitor...');
+          }
+
+          const res = await locationsApi.nearby(lat, lng, 150);
+          let nearest = res.data && res.data.length > 0 ? res.data[0] : null;
+
+          if (!nearest) {
+            // Client-side fallback: calculate distance to all available stations
+            const allRes = await locationsApi.list({ limit: 500 });
+            if (allRes.data && allRes.data.length > 0) {
+              const sorted = allRes.data
+                .filter((l) => l.coordinates?.latitude && l.coordinates?.longitude)
+                .map((l) => {
+                  const dLat = ((l.coordinates.latitude - lat) * Math.PI) / 180;
+                  const dLon = ((l.coordinates.longitude - lng) * Math.PI) / 180;
+                  const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos((lat * Math.PI) / 180) *
+                      Math.cos((l.coordinates.latitude * Math.PI) / 180) *
+                      Math.sin(dLon / 2) *
+                      Math.sin(dLon / 2);
+                  const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return { ...l, dist };
+                })
+                .sort((a, b) => a.dist - b.dist);
+              if (sorted.length > 0) {
+                nearest = sorted[0];
+              }
+            }
+          }
+
+          if (nearest) {
+            const targetId = Number(nearest.openaqId || (nearest as any).id);
+            if (targetId && !isSyntheticLocationId(targetId)) {
+              setSelectedLocation(targetId);
+              addRecentLocation({ ...nearest, openaqId: targetId });
+              setDetectedStation(nearest.name);
+              const distMsg = (nearest as any).dist ? ` (${(nearest as any).dist.toFixed(1)} km away)` : '';
+              if (bootMode) {
+                setBootStatus(`Locked onto ${nearest.name}${distMsg}`);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to detect nearest station:', e);
+          if (!bootMode) setLocateError('Unable to detect nearby stations.');
+        } finally {
+          if (!bootMode) {
+            setLocating(false);
+          } else {
+            setTimeout(() => {
+              sessionStorage.setItem('bb_initial_boot_done', 'true');
+              setIsInitialBoot(false);
+            }, 900);
+          }
+        }
+      },
+      (err) => {
+        console.warn('Geolocation denied or failed:', err);
+        if (!bootMode) {
+          setLocateError('Location permission denied or timed out.');
+          setLocating(false);
+        } else {
+          setBootStatus('Location permission unavailable. Connecting to national benchmark station...');
+          setTimeout(() => {
+            sessionStorage.setItem('bb_initial_boot_done', 'true');
+            setIsInitialBoot(false);
+          }, 800);
+        }
+      },
+      { timeout: 5000, enableHighAccuracy: true }
+    );
+  };
+
+  // Auto-detect user location on initial visit if first boot
+  useEffect(() => {
+    if (!sessionStorage.getItem('bb_initial_boot_done')) {
+      handleLocateMe(true);
+    }
+  }, []);
 
   const [guideOpen, setGuideOpen] = useState(false);
   const [guidePollutant, setGuidePollutant] = useState('pm25');
@@ -198,16 +307,25 @@ export function OverviewPage() {
   const aqiColor = getAQIColorHex(aqi?.category as AQICategory);
   const figureDetails = getAqiFigureDetails(aqi?.category);
 
+  if (isInitialBoot) {
+    return (
+      <AirLoadingWidget
+        variant="fullscreen"
+        title="Connecting to India Clean Air Network"
+        subtitle={bootStatus}
+        stationName={detectedStation || undefined}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <div className="h-14 bg-muted/40 rounded-2xl animate-pulse" />
-        <div className="h-80 bg-muted/30 rounded-3xl animate-pulse" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-32 bg-muted/20 rounded-2xl animate-pulse" />
-          ))}
-        </div>
+        <AirLoadingWidget
+          variant="card"
+          title="Calibrating Live Station Telemetry"
+          subtitle="Harmonizing statutory CPCB pollutant sub-indices & microclimatic weather..."
+        />
       </div>
     );
   }
@@ -218,12 +336,17 @@ export function OverviewPage() {
         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
         <h2 className="text-xl font-bold text-foreground">Station Telemetry Unavailable</h2>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Could not retrieve physical readings for this monitoring location. Please pick an alternative station using the search bar above.
+          The requested station ID is not active or reporting telemetry.
         </p>
-        <Button onClick={() => refetch()} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Retry Sync
-        </Button>
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button onClick={() => refetch()} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry Sync
+          </Button>
+          <Button onClick={() => setSelectedLocation(17)} size="sm">
+            Switch to Active Station (R K Puram, Delhi)
+          </Button>
+        </div>
       </div>
     );
   }
@@ -291,7 +414,17 @@ export function OverviewPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLocateMe}
+              disabled={locating}
+              className="shadow-2xs rounded-xl border-border/80 bg-card/90 hover:bg-muted font-medium text-xs flex items-center gap-1.5"
+            >
+              <Navigation className={`w-3.5 h-3.5 text-primary ${locating ? 'animate-spin' : ''}`} />
+              <span>{locating ? 'Finding...' : 'Use My GPS'}</span>
+            </Button>
             {dashboard && <AQIShareCard dashboard={dashboard} />}
             <Button
               variant="outline"
@@ -305,6 +438,21 @@ export function OverviewPage() {
             </Button>
           </div>
         </div>
+
+        {locateError && (
+          <div className="mt-3 p-3 text-xs bg-amber-500/10 border border-amber-500/20 text-amber-800 rounded-xl flex items-center justify-between gap-2 relative z-10">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>{locateError}</span>
+            </div>
+            <button
+              onClick={() => setLocateError(null)}
+              className="text-amber-800 font-bold hover:underline text-[11px]"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* 3-Pillar Atmosphere Centerpiece */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 relative z-10 items-center">

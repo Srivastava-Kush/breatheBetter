@@ -44,20 +44,58 @@ export function Layout() {
   const { addRecentLocation, setSelectedLocation } = useAppStore();
 
   const handleLocationSelect = (loc: Location) => {
-    addRecentLocation(loc);
+    const targetId = Number(loc.openaqId || (loc as any).id);
+    if (targetId) {
+      setSelectedLocation(targetId);
+      addRecentLocation({ ...loc, openaqId: targetId });
+    }
   };
 
   const handleNearMe = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const res = await locationsApi.nearby(pos.coords.latitude, pos.coords.longitude, 100);
-          if (res.data && res.data.length > 0) {
-            const nearest = res.data[0];
-            setSelectedLocation(nearest.openaqId);
-            addRecentLocation(nearest);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const res = await locationsApi.nearby(lat, lng, 150);
+          let nearest = res.data && res.data.length > 0 ? res.data[0] : null;
+
+          if (!nearest) {
+            // Client-side fallback: calculate distance to all available stations
+            const allRes = await locationsApi.list({ limit: 500 });
+            if (allRes.data && allRes.data.length > 0) {
+              const sorted = allRes.data
+                .filter((l) => l.coordinates?.latitude && l.coordinates?.longitude)
+                .map((l) => {
+                  const dLat = ((l.coordinates.latitude - lat) * Math.PI) / 180;
+                  const dLon = ((l.coordinates.longitude - lng) * Math.PI) / 180;
+                  const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos((lat * Math.PI) / 180) *
+                      Math.cos((l.coordinates.latitude * Math.PI) / 180) *
+                      Math.sin(dLon / 2) *
+                      Math.sin(dLon / 2);
+                  const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  return { ...l, dist };
+                })
+                .sort((a, b) => a.dist - b.dist);
+              if (sorted.length > 0) {
+                nearest = sorted[0];
+              }
+            }
+          }
+
+          if (nearest) {
+            const targetId = Number(nearest.openaqId || (nearest as any).id);
+            if (targetId) {
+              setSelectedLocation(targetId);
+              addRecentLocation({ ...nearest, openaqId: targetId });
+            }
           }
         } catch (e) {
           console.error('Failed to locate nearby station:', e);
@@ -65,9 +103,11 @@ export function Layout() {
           setLocating(false);
         }
       },
-      () => {
+      (err) => {
+        console.warn('Geolocation denied or failed:', err);
         setLocating(false);
-      }
+      },
+      { timeout: 10000, enableHighAccuracy: true }
     );
   };
 

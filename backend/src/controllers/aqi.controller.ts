@@ -3,6 +3,7 @@ import { getLatestAQI, getLatestPollutants, updateLatestReadings } from '../serv
 import { getHealthRecommendation, getDominantPollutantDescription } from '../services/health.service';
 import { getLocationById } from '../services/location.service';
 import { fetchCurrentWeather } from '../providers/openmeteo/weather.api';
+import { apiCache } from '../utils/cache';
 import { logger } from '../utils/logger';
 import { AQICategory } from '../utils/aqi-calculator';
 
@@ -14,20 +15,27 @@ export async function getCurrentAQI(req: Request, res: Response): Promise<void> 
       return;
     }
 
+    const cacheKey = `current:${locationId}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json({ success: true, data: cached });
+      return;
+    }
+
     const [aqiSnapshot, latestPollutants] = await Promise.all([
       getLatestAQI(locationId),
       getLatestPollutants(locationId),
     ]);
 
-    res.json({
-      success: true,
-      data: {
-        locationId,
-        aqi: aqiSnapshot,
-        pollutants: latestPollutants,
-        calculatedAt: aqiSnapshot?.calculatedAt ?? null,
-      },
-    });
+    const resultData = {
+      locationId,
+      aqi: aqiSnapshot,
+      pollutants: latestPollutants,
+      calculatedAt: aqiSnapshot?.calculatedAt ?? null,
+    };
+
+    apiCache.set(cacheKey, resultData, 600); // 10 min TTL
+    res.json({ success: true, data: resultData });
   } catch (error) {
     logger.error('getCurrentAQI error:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve AQI' });
@@ -39,6 +47,13 @@ export async function getDashboardData(req: Request, res: Response): Promise<voi
     const locationId = parseInt(req.params['locationId'] as string, 10);
     if (isNaN(locationId)) {
       res.status(400).json({ success: false, error: 'Invalid location ID' });
+      return;
+    }
+
+    const cacheKey = `dashboard:${locationId}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json({ success: true, data: cached });
       return;
     }
 
@@ -59,38 +74,38 @@ export async function getDashboardData(req: Request, res: Response): Promise<voi
       ? getDominantPollutantDescription(aqiSnapshot.dominantPollutant)
       : null;
 
-    res.json({
-      success: true,
-      data: {
-        location: {
-          id: location.openaqId,
-          name: location.name,
-          locality: location.locality,
-          country: location.country,
-          coordinates: location.coordinates,
-          isMonitor: location.isMonitor,
-          isMobile: location.isMobile,
-          provider: location.provider,
-        },
-        aqi: aqiSnapshot
-          ? {
-              value: aqiSnapshot.isValid ? aqiSnapshot.aqi : null,
-              category: aqiSnapshot.isValid ? aqiSnapshot.category : null,
-              dominantPollutant: aqiSnapshot.isValid ? aqiSnapshot.dominantPollutant : null,
-              subIndices: aqiSnapshot.subIndices,
-              isValid: aqiSnapshot.isValid,
-              invalidReason: aqiSnapshot.invalidReason,
-              calculatedAt: aqiSnapshot.calculatedAt,
-              displayLabel: aqiSnapshot.isValid
-                ? 'BreatheBetter AQI — Calculated using CPCB methodology'
-                : 'AQI unavailable — insufficient valid pollutant data',
-            }
-          : null,
-        pollutants: latestPollutants,
-        health: healthRec,
-        dominantPollutantDescription: dominantDesc,
+    const resultData = {
+      location: {
+        id: location.openaqId,
+        name: location.name,
+        locality: location.locality,
+        country: location.country,
+        coordinates: location.coordinates,
+        isMonitor: location.isMonitor,
+        isMobile: location.isMobile,
+        provider: location.provider,
       },
-    });
+      aqi: aqiSnapshot
+        ? {
+            value: aqiSnapshot.isValid ? aqiSnapshot.aqi : null,
+            category: aqiSnapshot.isValid ? aqiSnapshot.category : null,
+            dominantPollutant: aqiSnapshot.isValid ? aqiSnapshot.dominantPollutant : null,
+            subIndices: aqiSnapshot.subIndices,
+            isValid: aqiSnapshot.isValid,
+            invalidReason: aqiSnapshot.invalidReason,
+            calculatedAt: aqiSnapshot.calculatedAt,
+            displayLabel: aqiSnapshot.displayLabel || (aqiSnapshot.isValid
+              ? 'BreatheBetter AQI — Calculated using CPCB methodology'
+              : 'AQI unavailable — insufficient valid pollutant data'),
+          }
+        : null,
+      pollutants: latestPollutants,
+      health: healthRec,
+      dominantPollutantDescription: dominantDesc,
+    };
+
+    apiCache.set(cacheKey, resultData, 600); // 10 min TTL
+    res.json({ success: true, data: resultData });
   } catch (error) {
     logger.error('getDashboardData error:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve dashboard data' });
@@ -105,6 +120,10 @@ export async function refreshLocationData(req: Request, res: Response): Promise<
       return;
     }
 
+    apiCache.delete(`dashboard:${locationId}`);
+    apiCache.delete(`current:${locationId}`);
+    apiCache.delete(`weather:${locationId}`);
+
     await updateLatestReadings(locationId);
     res.json({ success: true, message: 'Location data refreshed' });
   } catch (error) {
@@ -118,6 +137,13 @@ export async function getWeatherHandler(req: Request, res: Response): Promise<vo
     const locationId = parseInt(req.params['locationId'] as string, 10);
     if (isNaN(locationId)) {
       res.status(400).json({ success: false, error: 'Invalid location ID' });
+      return;
+    }
+
+    const cacheKey = `weather:${locationId}`;
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) {
+      res.json({ success: true, data: cached });
       return;
     }
 
@@ -137,6 +163,7 @@ export async function getWeatherHandler(req: Request, res: Response): Promise<vo
       return;
     }
 
+    apiCache.set(cacheKey, weather, 900); // 15 min TTL
     res.json({ success: true, data: weather });
   } catch (error) {
     logger.error('getWeatherHandler error:', error);

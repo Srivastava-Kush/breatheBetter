@@ -14,12 +14,13 @@ import {
   Info,
 } from 'lucide-react';
 import { useHistory, useAnomalies } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { POLLUTANT_DISPLAY } from '../types';
 import { PollutantGuideModal } from '../components/PollutantGuideModal';
 import { DiurnalHeatmap } from '../components/DiurnalHeatmap';
+import { AirLoadingWidget } from '../components/AirLoadingWidget';
 import { useNavigate } from 'react-router-dom';
 import {
   ResponsiveContainer,
@@ -64,7 +65,17 @@ function PollutantChart({
   const display = POLLUTANT_DISPLAY[pollutant] ?? { label: pollutant.toUpperCase(), unit: '' };
   const color = CHART_COLORS[pollutant] ?? '#009966';
 
-  if (isLoading) return <div className="h-48 bg-muted/30 rounded-xl animate-pulse" />;
+  if (isLoading) {
+    return (
+      <div className="p-4 rounded-xl border border-border/80 bg-card/60">
+        <AirLoadingWidget
+          variant="inline"
+          title={`Fetching ${display.label} Telemetry Series`}
+          subtitle={`Querying OpenAQ ${hours}h sensor observations...`}
+        />
+      </div>
+    );
+  }
 
   const points = data?.data?.map((d) => ({
     time: new Date(d.measurementUtc).toLocaleDateString('en-IN', {
@@ -165,16 +176,17 @@ export function AnalyticsPage() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guidePollutant, setGuidePollutant] = useState('pm25');
   const { selectedLocationId } = useAppStore();
+  const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : 17;
   const navigate = useNavigate();
 
   const { data: allHistoryRes, isLoading: allHistoryLoading } = useHistory(
-    selectedLocationId,
+    locationId,
     hours
   );
   const allObservations = (allHistoryRes?.data as any[]) ?? [];
 
   const { data: anomaliesRes, isLoading: anomaliesLoading } = useAnomalies(
-    selectedLocationId,
+    locationId,
     hours,
     'pm25'
   );
@@ -274,7 +286,12 @@ export function AnalyticsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {anomaliesLoading && (
-            <div className="h-16 bg-muted/40 rounded-lg animate-pulse" />
+            <div className="py-2">
+              <AirLoadingWidget
+                variant="compact"
+                title={`Evaluating statistical Z-Score & IQR anomaly model over ${hours}h series...`}
+              />
+            </div>
           )}
 
           {!anomaliesLoading && anomalies.length === 0 && (
@@ -397,7 +414,7 @@ export function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <PollutantChart
-                locationId={selectedLocationId}
+                locationId={locationId}
                 pollutant={p}
                 hours={hours}
                 onOpenGuide={(pol) => {

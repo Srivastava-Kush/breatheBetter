@@ -43,7 +43,7 @@ const AQISnapshotSchema = new Schema<IAQISnapshot>(
     calculationStandard: { type: String, enum: ['CPCB'], default: 'CPCB' },
     aqi: { type: Number, required: true },
     category: { type: String, required: true },
-    dominantPollutant: { type: String, required: true },
+    dominantPollutant: { type: String, default: null },
     subIndices: [SubIndexSchema],
     inputObservationIds: [{ type: Schema.Types.ObjectId, ref: 'Observation' }],
     calculatedAt: { type: Date, default: Date.now },

@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Share2, Download, Copy, Check, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { getAQIColorHex } from '../utils';
@@ -142,6 +143,16 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
@@ -149,94 +160,103 @@ export function AQIShareCard({ dashboard }: AQIShareCardProps) {
         Share AQI Card
       </Button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Share2 className="w-5 h-5 text-primary" />
-                <h3 className="font-bold text-lg">Share Air Quality Card</h3>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Visual Card Preview */}
+      {isOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsOpen(false)}
+          >
             <div
-              className="p-5 rounded-xl text-white space-y-4 shadow-inner"
-              style={{
-                background: 'linear-gradient(135deg, #0a1d16 0%, #05110d 100%)',
-                borderTop: `6px solid ${aqiColor}`,
-              }}
+              className="relative w-full max-w-lg bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between text-xs text-emerald-400">
-                <span className="font-semibold tracking-wider uppercase">🍃 BreatheBetter</span>
-                <span>Live Intelligence</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-primary" />
+                  <h3 className="font-bold text-lg text-foreground">Share Air Quality Card</h3>
+                </div>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  title="Close share dialog"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <div className="text-xl font-bold text-white line-clamp-1">{locName}</div>
-                <div className="text-xs text-gray-400">{dashboard.location.locality || 'India'}</div>
-              </div>
+              {/* Visual Card Preview */}
+              <div
+                className="p-5 rounded-xl text-white space-y-4 shadow-inner"
+                style={{
+                  background: 'linear-gradient(135deg, #0a1d16 0%, #05110d 100%)',
+                  borderTop: `6px solid ${aqiColor}`,
+                }}
+              >
+                <div className="flex items-center justify-between text-xs text-emerald-400">
+                  <span className="font-semibold tracking-wider uppercase">🍃 BreatheBetter</span>
+                  <span>Live Intelligence</span>
+                </div>
 
-              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xl font-bold text-white line-clamp-1">{locName}</div>
+                  <div className="text-xs text-gray-400">{dashboard.location.locality || 'India'}</div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div
+                    className="px-4 py-3 rounded-xl flex items-baseline gap-2 shadow-md shrink-0"
+                    style={{
+                      backgroundColor: aqiColor,
+                      color: aqiCat === 'Moderate' ? '#111827' : '#ffffff',
+                    }}
+                  >
+                    <span className="text-4xl font-extrabold">{aqiVal}</span>
+                    <span className="text-sm font-semibold">{aqiCat}</span>
+                  </div>
+
+                  <div className="flex-1 flex justify-center">
+                    <AqiVisualFigure category={aqiCat} size="sm" showDetails={false} />
+                  </div>
+
+                  <div className="text-right text-xs space-y-0.5 text-gray-300 shrink-0">
+                    <div>PM2.5: <strong className="text-white">{pm25} µg/m³</strong></div>
+                    <div>PM10: <strong className="text-white">{pm10} µg/m³</strong></div>
+                    <div>Dominant: <strong className="text-white">{dominant}</strong></div>
+                  </div>
+                </div>
+
+                {/* Action Badge */}
                 <div
-                  className="px-4 py-3 rounded-xl flex items-baseline gap-2 shadow-md shrink-0"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-center shadow-xs"
                   style={{
                     backgroundColor: aqiColor,
                     color: aqiCat === 'Moderate' ? '#111827' : '#ffffff',
                   }}
                 >
-                  <span className="text-4xl font-extrabold">{aqiVal}</span>
-                  <span className="text-sm font-semibold">{aqiCat}</span>
+                  {figureDetails.badge}
                 </div>
 
-                <div className="flex-1 flex justify-center">
-                  <AqiVisualFigure category={aqiCat} size="sm" showDetails={false} />
-                </div>
-
-                <div className="text-right text-xs space-y-0.5 text-gray-300 shrink-0">
-                  <div>PM2.5: <strong className="text-white">{pm25} µg/m³</strong></div>
-                  <div>PM10: <strong className="text-white">{pm10} µg/m³</strong></div>
-                  <div>Dominant: <strong className="text-white">{dominant}</strong></div>
+                <div className="text-[10px] text-gray-400 pt-1 border-t border-white/10 flex justify-between">
+                  <span>Calculated using CPCB methodology</span>
+                  <span>OpenAQ Ground Telemetry</span>
                 </div>
               </div>
 
-              {/* Action Badge */}
-              <div
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-center shadow-xs"
-                style={{
-                  backgroundColor: aqiColor,
-                  color: aqiCat === 'Moderate' ? '#111827' : '#ffffff',
-                }}
-              >
-                {figureDetails.badge}
-              </div>
-
-              <div className="text-[10px] text-gray-400 pt-1 border-t border-white/10 flex justify-between">
-                <span>Calculated using CPCB methodology</span>
-                <span>OpenAQ</span>
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button onClick={generateCanvasImage} className="flex-1 shadow-xs">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PNG Image
+                </Button>
+                <Button variant="outline" onClick={copyShareText} className="shadow-xs">
+                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  <span className="ml-2">{copied ? 'Copied!' : 'Copy Text'}</span>
+                </Button>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <Button onClick={generateCanvasImage} className="flex-1">
-                <Download className="w-4 h-4 mr-2" />
-                Download PNG Image
-              </Button>
-              <Button variant="outline" onClick={copyShareText}>
-                {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                <span className="ml-2">{copied ? 'Copied!' : 'Copy Text'}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

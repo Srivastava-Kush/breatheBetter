@@ -10,10 +10,12 @@ import {
   Radio,
   ChevronRight,
   Compass,
+  Check,
 } from 'lucide-react';
 import { useCityAirQuality } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { getAQIColorHex } from '../utils';
+import { AirLoadingWidget } from './AirLoadingWidget';
 import type { AQICategory } from '../types';
 import type { SelectedCity } from './CitySearch';
 
@@ -22,6 +24,8 @@ interface CityAirQualityPanelProps {
   onClose: () => void;
   onSelectStation?: (stationId: number) => void;
   onAutoPan?: (coords: Array<[number, number]>) => void;
+  onFocusStation?: (stationId: number, lat: number, lng: number) => void;
+  focusedStationId?: number | null;
 }
 
 export function CityAirQualityPanel({
@@ -29,8 +33,12 @@ export function CityAirQualityPanel({
   onClose,
   onSelectStation,
   onAutoPan,
+  onFocusStation,
+  focusedStationId,
 }: CityAirQualityPanelProps) {
   const [radius, setRadius] = useState<number>(25);
+  const [localFocusedId, setLocalFocusedId] = useState<number | null>(null);
+  const activeFocusId = focusedStationId ?? localFocusedId;
   const navigate = useNavigate();
   const { setSelectedLocation } = useAppStore();
 
@@ -42,7 +50,7 @@ export function CityAirQualityPanel({
     state: city.state,
   });
 
-  const cityData = res?.data as any;
+  const cityData = ((res as any)?.data || res) as any;
   const overview = cityData?.overview;
   const stations = cityData?.stations || [];
   const nearestAlternatives = cityData?.nearestAlternativeStations || [];
@@ -75,8 +83,11 @@ export function CityAirQualityPanel({
     }
   };
 
-  const handlePanToStation = (lat: number, lng: number) => {
-    if (onAutoPan) {
+  const handlePanToStation = (stationId: number, lat: number, lng: number) => {
+    setLocalFocusedId(stationId);
+    if (onFocusStation) {
+      onFocusStation(stationId, lat, lng);
+    } else if (onAutoPan) {
       onAutoPan([[lat, lng]]);
     }
   };
@@ -145,10 +156,11 @@ export function CityAirQualityPanel({
       {/* Body Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading && (
-          <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs">Searching for ground stations...</p>
-          </div>
+          <AirLoadingWidget
+            variant="inline"
+            title="Scanning Ground Monitoring Network"
+            subtitle={`Searching for active CPCB monitors within ${radius} km of ${city.name}...`}
+          />
         )}
 
         {error && (
@@ -157,10 +169,10 @@ export function CityAirQualityPanel({
           </div>
         )}
 
-        {!isLoading && overview && (
+        {!isLoading && (overview || stations.length > 0 || nearestAlternatives.length > 0) && (
           <>
             {/* City Overview Card (When ground stations exist) */}
-            {stations.length > 0 && (
+            {stations.length > 0 && overview && (
               <div className="p-3.5 rounded-xl bg-card border border-border shadow-xs space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -188,7 +200,7 @@ export function CityAirQualityPanel({
                   </div>
                 )}
 
-                {overview.availablePollutants.length > 0 && (
+                {overview.availablePollutants && overview.availablePollutants.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     <span className="text-[11px] text-muted-foreground mr-1 self-center">Sensors:</span>
                     {overview.availablePollutants.map((pol: string) => (
@@ -223,17 +235,29 @@ export function CityAirQualityPanel({
                   const aqiColor = st.aqiCategory
                     ? getAQIColorHex(st.aqiCategory as AQICategory)
                     : '#9ca3af';
+                  const isFocused = activeFocusId === st.id;
 
                   return (
                     <div
                       key={st.id}
-                      className="p-3 rounded-xl bg-card border border-border hover:border-primary/50 transition-all shadow-xs space-y-2"
+                      className={`p-3.5 rounded-xl transition-all shadow-xs space-y-2 ${
+                        isFocused
+                          ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
+                          : 'bg-card border border-border hover:border-primary/50'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-semibold text-sm text-foreground leading-tight">
-                            {st.name}
-                          </h3>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-semibold text-sm text-foreground leading-tight">
+                              {st.name}
+                            </h3>
+                            {isFocused && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground flex items-center gap-1 shrink-0 shadow-xs">
+                                <Check className="w-2.5 h-2.5" /> Focused
+                              </span>
+                            )}
+                          </div>
                           {st.locality && (
                             <p className="text-xs text-muted-foreground">{st.locality}</p>
                           )}
@@ -260,8 +284,11 @@ export function CityAirQualityPanel({
                               {st.aqi} · {st.aqiCategory}
                             </div>
                           ) : (
-                            <div className="px-2 py-1 rounded-lg text-[10px] bg-muted text-muted-foreground font-medium text-center">
-                              No AQI
+                            <div
+                              className="px-2 py-1 rounded-lg text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-800 font-medium text-center"
+                              title="Sensors active; awaiting next observation cycle"
+                            >
+                              Calibrating
                             </div>
                           )}
                         </div>
@@ -285,15 +312,28 @@ export function CityAirQualityPanel({
 
                       <div className="grid grid-cols-2 gap-1.5 mt-1.5">
                         <button
-                          onClick={() => handlePanToStation(st.coordinates.latitude, st.coordinates.longitude)}
-                          className="py-1 px-2 rounded-lg text-xs font-medium border border-border bg-card hover:bg-muted text-foreground flex items-center justify-center gap-1 transition-colors"
+                          onClick={() => handlePanToStation(st.id, st.coordinates.latitude, st.coordinates.longitude)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            isFocused
+                              ? 'bg-primary text-primary-foreground shadow-xs'
+                              : 'border border-border bg-card hover:bg-muted text-foreground'
+                          }`}
                         >
-                          <Compass className="w-3 h-3 text-primary" />
-                          Focus on Map
+                          {isFocused ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Focused on Map</span>
+                            </>
+                          ) : (
+                            <>
+                              <Compass className="w-3.5 h-3.5 text-primary" />
+                              <span>Focus on Map</span>
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={() => handleOpenStation(st.id)}
-                          className="py-1 px-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-1 transition-colors shadow-xs"
+                          className="py-1.5 px-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-1 transition-colors shadow-xs"
                         >
                           Station Analytics
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -360,17 +400,29 @@ export function CityAirQualityPanel({
                       const aqiColor = alt.aqiCategory
                         ? getAQIColorHex(alt.aqiCategory as AQICategory)
                         : '#9ca3af';
+                      const isFocused = activeFocusId === alt.id;
 
                       return (
                         <div
                           key={`alt-${alt.id}`}
-                          className="p-3 rounded-xl bg-card border border-border hover:border-primary/50 transition-all shadow-xs space-y-2"
+                          className={`p-3 rounded-xl transition-all shadow-xs space-y-2 ${
+                            isFocused
+                              ? 'border-2 border-primary bg-primary/[0.04] shadow-md ring-2 ring-primary/20'
+                              : 'bg-card border border-border hover:border-primary/50'
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <h3 className="font-semibold text-sm text-foreground leading-tight">
-                                {alt.name}
-                              </h3>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h3 className="font-semibold text-sm text-foreground leading-tight">
+                                  {alt.name}
+                                </h3>
+                                {isFocused && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground flex items-center gap-1 shrink-0 shadow-xs">
+                                    <Check className="w-2.5 h-2.5" /> Focused
+                                  </span>
+                                )}
+                              </div>
                               {alt.locality && (
                                 <p className="text-xs text-muted-foreground">{alt.locality}</p>
                               )}
@@ -402,11 +454,24 @@ export function CityAirQualityPanel({
 
                           <div className="grid grid-cols-2 gap-1.5 mt-1">
                             <button
-                              onClick={() => handlePanToStation(alt.coordinates.latitude, alt.coordinates.longitude)}
-                              className="py-1 px-2 rounded-lg text-xs font-medium border border-border bg-card hover:bg-muted text-foreground flex items-center justify-center gap-1 transition-colors"
+                              onClick={() => handlePanToStation(alt.id, alt.coordinates.latitude, alt.coordinates.longitude)}
+                              className={`py-1 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer ${
+                                isFocused
+                                  ? 'bg-primary text-primary-foreground shadow-xs'
+                                  : 'border border-border bg-card hover:bg-muted text-foreground'
+                              }`}
                             >
-                              <Compass className="w-3 h-3 text-primary" />
-                              Pan Map Here
+                              {isFocused ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span>Focused</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Compass className="w-3 h-3 text-primary" />
+                                  <span>Pan Map Here</span>
+                                </>
+                              )}
                             </button>
                             <button
                               onClick={() => handleOpenStation(alt.id)}
@@ -455,6 +520,24 @@ export function CityAirQualityPanel({
               </div>
             )}
           </>
+        )}
+
+        {!isLoading && !error && !overview && stations.length === 0 && nearestAlternatives.length === 0 && (
+          <div className="p-4 rounded-xl bg-muted/40 border border-border text-center space-y-2">
+            <Info className="w-5 h-5 text-primary mx-auto" />
+            <p className="text-xs font-semibold text-foreground">Scanning for Ground Monitoring Stations</p>
+            <p className="text-[11px] text-muted-foreground">
+              No ground stations found in {radius} km of {city.name}. Try expanding the search radius.
+            </p>
+            {radius < 50 && (
+              <button
+                onClick={() => setRadius(50)}
+                className="mt-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
+              >
+                Expand to 50 km
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

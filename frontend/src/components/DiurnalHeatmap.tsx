@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { POLLUTANT_DISPLAY, type AQICategory } from '../types';
 import { getAQIColorHex, getAQICategory } from '../utils';
+import { AirLoadingWidget } from './AirLoadingWidget';
 
 interface ObservationPoint {
   pollutant: string;
@@ -289,13 +290,12 @@ export function DiurnalHeatmap({
 
   if (isLoading) {
     return (
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <div className="h-6 w-72 bg-muted/50 rounded-lg animate-pulse" />
-        </CardHeader>
-        <CardContent>
-          <div className="h-56 bg-muted/30 rounded-xl animate-pulse" />
-        </CardContent>
+      <Card className="border-border overflow-hidden">
+        <AirLoadingWidget
+          variant="card"
+          title="Synthesizing 24-Hour Diurnal Pollution Matrix"
+          subtitle={`Aggregating multi-pollutant concentrations across ${hoursWindow}h observation window...`}
+        />
       </Card>
     );
   }

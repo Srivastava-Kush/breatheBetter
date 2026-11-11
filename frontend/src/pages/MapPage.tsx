@@ -157,7 +157,7 @@ function MapViewportHandler({ targets }: { targets: Array<[number, number]> | nu
     if (!targets || targets.length === 0) return;
 
     if (targets.length === 1) {
-      map.flyTo(targets[0], 12, { duration: 1.2 });
+      map.flyTo(targets[0], 14, { duration: 1.2 });
     } else {
       const bounds = L.latLngBounds(targets.map((c) => L.latLng(c[0], c[1])));
       map.fitBounds(bounds, {
@@ -210,7 +210,7 @@ export function MapPage() {
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [monitorFilter, setMonitorFilter] = useState<'all' | 'reference' | 'sensors'>('all');
-  const [aqiFilter, setAqiFilter] = useState<'all' | 'valid' | 'unavailable'>('all');
+  const [aqiFilter, setAqiFilter] = useState<'all' | 'valid' | 'unavailable'>('valid');
   const [showHalo, setShowHalo] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [highlightIndia, setHighlightIndia] = useState(true);
@@ -218,6 +218,7 @@ export function MapPage() {
 
   // Selected City & Viewport target
   const [selectedCity, setSelectedCity] = useState<SelectedCity | null>(null);
+  const [focusedStationId, setFocusedStationId] = useState<number | null>(null);
   const [viewportTargets, setViewportTargets] = useState<Array<[number, number]> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [tileLayerType, setTileLayerType] = useState<'streets' | 'satellite'>('streets');
@@ -307,6 +308,7 @@ export function MapPage() {
 
   const handleCitySelect = (city: SelectedCity) => {
     setSelectedCity(city);
+    setFocusedStationId(null);
 
     // Check if we have multiple ground stations in this city in our loaded station list
     const cityStations = rawLocations.filter((loc) => {
@@ -330,6 +332,11 @@ export function MapPage() {
     }
   };
 
+  const handleFocusStation = (stationId: number, lat: number, lng: number) => {
+    setFocusedStationId(stationId);
+    setViewportTargets([[lat, lng]]);
+  };
+
   const handleSelectStation = (stationId: number) => {
     setSelectedLocation(stationId);
     navigate('/');
@@ -349,7 +356,7 @@ export function MapPage() {
               <p className="text-xs text-muted-foreground">
                 {isLoading
                   ? 'Loading monitoring network...'
-                  : `${filteredLocations.length} stations visible across India`}
+                  : `${filteredLocations.length} stations ${aqiFilter === 'valid' ? 'reporting live AQI' : 'visible'} across India`}
               </p>
             </div>
           </div>
@@ -577,6 +584,7 @@ export function MapPage() {
             <StationMarkersLayer
               locations={displayedLocations}
               onSelectStation={handleSelectStation}
+              focusedStationId={focusedStationId}
             />
           ) : (
             <GlobalClusterMapLayer
@@ -594,10 +602,10 @@ export function MapPage() {
                 <Circle
                   key={`halo-${loc.openaqId}`}
                   center={[loc.coordinates.latitude, loc.coordinates.longitude]}
-                  radius={40000}
+                  radius={85000}
                   pathOptions={{
                     fillColor: color,
-                    fillOpacity: 0.12,
+                    fillOpacity: 0.18,
                     stroke: false,
                   }}
                 />
@@ -688,9 +696,14 @@ export function MapPage() {
         {selectedCity && (
           <CityAirQualityPanel
             city={selectedCity}
-            onClose={() => setSelectedCity(null)}
+            onClose={() => {
+              setSelectedCity(null);
+              setFocusedStationId(null);
+            }}
             onSelectStation={handleSelectStation}
             onAutoPan={handleAutoPan}
+            onFocusStation={handleFocusStation}
+            focusedStationId={focusedStationId}
           />
         )}
 

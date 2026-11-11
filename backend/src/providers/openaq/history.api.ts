@@ -67,14 +67,13 @@ export async function fetchAllSensorHours(
   sensorId: number,
   datetimeFrom: string,
   datetimeTo: string,
-  maxPages = 30
+  maxPages = 10
 ): Promise<OpenAQHourlyRecord[]> {
   const allRecords: OpenAQHourlyRecord[] = [];
   let page = 1;
-  let totalFound = Infinity;
   const limit = 100;
 
-  while (allRecords.length < totalFound && page <= maxPages) {
+  while (page <= maxPages) {
     try {
       const { meta, results } = await fetchSensorHours(sensorId, {
         datetimeFrom,
@@ -82,12 +81,23 @@ export async function fetchAllSensorHours(
         limit,
         page,
       });
-      totalFound = meta.found;
 
-      if (results.length === 0) break;
+      if (!results || results.length === 0) break;
       allRecords.push(...results);
 
-      if (allRecords.length >= totalFound) break;
+      // Reached the end if fewer records than page limit returned
+      if (results.length < limit) break;
+
+      const foundStr = String(meta?.found ?? '');
+      if (!foundStr.includes('>')) {
+        const numericFound =
+          typeof meta?.found === 'number'
+            ? meta.found
+            : parseInt(foundStr.replace(/\D/g, ''), 10) || Infinity;
+
+        if (allRecords.length >= numericFound) break;
+      }
+
       page++;
     } catch (error) {
       logger.error(`Failed to fetch page ${page} for sensor ${sensorId}:`, error);

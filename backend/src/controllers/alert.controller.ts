@@ -110,4 +110,3 @@ export async function deleteAlert(req: Request, res: Response): Promise<void> {
     res.status(500).json({ success: false, error: 'Failed to delete alert' });
   }
 }
-
