@@ -32,10 +32,10 @@ function getLevel(pollutant: string, value: number): 'good' | 'moderate' | 'poor
 }
 
 const LEVEL_COLORS = {
-  good: 'text-[#009966] bg-[#009966]/10',
-  moderate: 'text-[#ffde33] bg-[#ffde33]/10',
-  poor: 'text-[#ff7e00] bg-[#ff7e00]/10',
-  severe: 'text-[#cc0033] bg-[#cc0033]/10',
+  good: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20',
+  moderate: 'text-amber-800 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/20',
+  poor: 'text-orange-800 dark:text-orange-300 bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/20',
+  severe: 'text-rose-800 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/20',
 };
 
 export function PollutantCard({

@@ -242,7 +242,7 @@ export function StationMarkersLayer({ locations, onSelectStation, focusedStation
 
       const actionBtn = document.createElement('button');
       actionBtn.className =
-        'w-full mt-2 py-1.5 px-3 rounded text-xs font-medium bg-[#106644] text-white hover:bg-[#0d5337] transition-colors text-center block shadow-xs cursor-pointer';
+        'w-full mt-2 py-1.5 px-3 rounded text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors text-center block shadow-xs cursor-pointer';
       actionBtn.textContent = 'Open Station Analytics →';
       actionBtn.onclick = () => {
         onSelectStation(loc.openaqId);

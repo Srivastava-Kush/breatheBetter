@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { POLLUTANT_DISPLAY, type AQICategory } from '../types';
 import { getAQIColorHex, getAQICategory } from '../utils';
 import { AirLoadingWidget } from './AirLoadingWidget';
+import { useIsDark } from '../stores/appStore';
 
 interface ObservationPoint {
   pollutant: string;
@@ -151,6 +152,7 @@ export function DiurnalHeatmap({
   isLoading,
   onOpenGuide,
 }: DiurnalHeatmapProps) {
+  const isDarkMode = useIsDark();
   const [viewMode, setViewMode] = useState<'severity' | 'subindex' | 'concentration'>('severity');
   const [hoveredCell, setHoveredCell] = useState<{
     pollutant: string;
@@ -347,35 +349,35 @@ export function DiurnalHeatmap({
         {/* Diurnal Intelligence Highlights */}
         {highlights.cleanest && highlights.worst && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-3 mt-1">
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                <Sun className="w-4 h-4 text-emerald-700" />
+            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/35 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center shrink-0">
+                <Sun className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
               </div>
               <div className="space-y-0.5">
                 <div className="font-bold flex items-center gap-1.5">
                   <span>Cleanest Diurnal Window:</span>
-                  <span className="px-1.5 py-0.2 rounded bg-emerald-200/80 font-mono text-[11px]">
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-200/80 dark:bg-emerald-900/80 font-mono text-[11px] text-emerald-950 dark:text-emerald-200">
                     {String(highlights.cleanest.hour).padStart(2, '0')}:00 – {String((highlights.cleanest.hour + 2) % 24).padStart(2, '0')}:00 IST
                   </span>
                 </div>
-                <p className="text-[11px] text-emerald-800/90 leading-tight">
+                <p className="text-[11px] text-emerald-800/90 dark:text-emerald-300/80 leading-tight">
                   Midday solar heating expands planetary boundary layer height, promoting atmospheric convective dispersion.
                 </p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
-                <Moon className="w-4 h-4 text-rose-700" />
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/35 border border-rose-200 dark:border-rose-800/60 text-rose-900 dark:text-rose-200 text-xs flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center shrink-0">
+                <Moon className="w-4 h-4 text-rose-700 dark:text-rose-400" />
               </div>
               <div className="space-y-0.5">
                 <div className="font-bold flex items-center gap-1.5">
                   <span>Peak Exposure Window:</span>
-                  <span className="px-1.5 py-0.2 rounded bg-rose-200/80 font-mono text-[11px]">
+                  <span className="px-1.5 py-0.2 rounded bg-rose-200/80 dark:bg-rose-900/80 font-mono text-[11px] text-rose-950 dark:text-rose-200">
                     {String(highlights.worst.hour).padStart(2, '0')}:00 – {String((highlights.worst.hour + 2) % 24).padStart(2, '0')}:00 IST
                   </span>
                 </div>
-                <p className="text-[11px] text-rose-800/90 leading-tight">
+                <p className="text-[11px] text-rose-800/90 dark:text-rose-300/80 leading-tight">
                   Nocturnal radiative surface cooling collapses mixing layer; ground thermal inversion traps traffic exhaust.
                 </p>
               </div>
@@ -391,17 +393,17 @@ export function DiurnalHeatmap({
             {/* Time of Day Quadrant Header */}
             <div className="grid grid-cols-[140px_repeat(24,minmax(0,1fr))] items-center gap-1 mb-1 text-[10px] text-muted-foreground font-semibold">
               <div className="text-right pr-2">Diurnal Period:</div>
-              <div className="col-span-6 bg-slate-100 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-slate-700 border border-slate-200/70">
-                <Moon className="w-3 h-3 text-slate-500" /> Night (00:00–05:59)
+              <div className="col-span-6 bg-slate-100 dark:bg-slate-800/70 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-700">
+                <Moon className="w-3 h-3 text-slate-500 dark:text-slate-400" /> Night (00:00–05:59)
               </div>
-              <div className="col-span-6 bg-amber-50 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-amber-800 border border-amber-200/70">
-                <Sunrise className="w-3 h-3 text-amber-600" /> Morning Rush (06:00–11:59)
+              <div className="col-span-6 bg-amber-50 dark:bg-amber-950/40 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-amber-800 dark:text-amber-200 border border-amber-200/70 dark:border-amber-800/50">
+                <Sunrise className="w-3 h-3 text-amber-600 dark:text-amber-400" /> Morning Rush (06:00–11:59)
               </div>
-              <div className="col-span-6 bg-sky-50 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-sky-800 border border-sky-200/70">
-                <Sun className="w-3 h-3 text-sky-600" /> Afternoon Sun (12:00–17:59)
+              <div className="col-span-6 bg-sky-50 dark:bg-sky-950/40 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-sky-800 dark:text-sky-200 border border-sky-200/70 dark:border-sky-800/50">
+                <Sun className="w-3 h-3 text-sky-600 dark:text-sky-400" /> Afternoon Sun (12:00–17:59)
               </div>
-              <div className="col-span-6 bg-purple-50 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-purple-800 border border-purple-200/70">
-                <Sunset className="w-3 h-3 text-purple-600" /> Evening Inversion (18:00–23:59)
+              <div className="col-span-6 bg-purple-50 dark:bg-purple-950/40 rounded px-1.5 py-0.5 text-center flex items-center justify-center gap-1 text-purple-800 dark:text-purple-200 border border-purple-200/70 dark:border-purple-800/50">
+                <Sunset className="w-3 h-3 text-purple-600 dark:text-purple-400" /> Evening Inversion (18:00–23:59)
               </div>
             </div>
 
@@ -449,9 +451,10 @@ export function DiurnalHeatmap({
                     {hours.map((h) => {
                       const cell = row[h];
                       const hasData = cell && cell.category !== null;
-                      const bg = hasData ? getAQIColorHex(cell.category) : '#f3f4f6';
-                      const isDark = cell?.category && ['Good', 'Poor', 'Very Poor', 'Severe'].includes(cell.category);
-                      const textColor = isDark ? '#ffffff' : '#111827';
+                      const emptyCellBg = isDarkMode ? '#1a2720' : '#f3f4f6';
+                      const bg = hasData ? getAQIColorHex(cell.category) : emptyCellBg;
+                      const isCellDark = cell?.category && ['Good', 'Poor', 'Very Poor', 'Severe'].includes(cell.category);
+                      const textColor = isCellDark ? '#ffffff' : '#111827';
 
                       return (
                         <div
@@ -470,7 +473,7 @@ export function DiurnalHeatmap({
                             }
                           }}
                           onMouseLeave={() => setHoveredCell(null)}
-                          className="h-8 rounded-[5px] flex items-center justify-center font-mono text-[10px] font-bold cursor-pointer transition-transform hover:scale-110 hover:z-20 shadow-2xs relative border border-black/5"
+                          className="h-8 rounded-[5px] flex items-center justify-center font-mono text-[10px] font-bold cursor-pointer transition-transform hover:scale-110 hover:z-20 shadow-2xs relative border border-black/5 dark:border-white/5"
                           style={{
                             backgroundColor: bg,
                             color: textColor,
@@ -483,7 +486,7 @@ export function DiurnalHeatmap({
                             </span>
                           )}
                           {viewMode === 'severity' && !hasData && (
-                            <span className="text-gray-400 font-normal text-[9px]">—</span>
+                            <span className="text-muted-foreground/60 font-normal text-[9px]">—</span>
                           )}
                         </div>
                       );
@@ -503,14 +506,15 @@ export function DiurnalHeatmap({
                 {hours.map((h) => {
                   const comp = compositePeak[h];
                   const hasData = comp && comp.peakAQI !== null;
-                  const bg = hasData ? getAQIColorHex(comp.category) : '#f3f4f6';
-                  const isDark = comp?.category && ['Good', 'Poor', 'Very Poor', 'Severe'].includes(comp.category);
-                  const textColor = isDark ? '#ffffff' : '#111827';
+                  const emptyCompBg = isDarkMode ? '#1a2720' : '#f3f4f6';
+                  const bg = hasData ? getAQIColorHex(comp.category) : emptyCompBg;
+                  const isCompDark = comp?.category && ['Good', 'Poor', 'Very Poor', 'Severe'].includes(comp.category);
+                  const textColor = isCompDark ? '#ffffff' : '#111827';
 
                   return (
                     <div
                       key={`comp-${h}`}
-                      className="h-8 rounded-[5px] flex items-center justify-center font-mono text-[10px] font-extrabold shadow-xs transition-transform hover:scale-110 hover:z-20 relative border-2 border-white"
+                      className="h-8 rounded-[5px] flex items-center justify-center font-mono text-[10px] font-extrabold shadow-xs transition-transform hover:scale-110 hover:z-20 relative border-2 border-card"
                       style={{
                         backgroundColor: bg,
                         color: textColor,

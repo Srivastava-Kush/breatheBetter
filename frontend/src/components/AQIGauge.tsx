@@ -114,7 +114,7 @@ export function AQIGauge({ aqi, category, size = 'md', showLabel = true }: AQIGa
             cy={cy}
             r={radius}
             fill="none"
-            stroke="#e2e8f0"
+            stroke="var(--gauge-track, #e2e8f0)"
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${arcLength} ${circumference}`}
@@ -138,9 +138,9 @@ export function AQIGauge({ aqi, category, size = 'md', showLabel = true }: AQIGa
                 y1={y1}
                 x2={x2}
                 y2={y2}
-                stroke="#94a3b8"
+                stroke="var(--gauge-tick, #94a3b8)"
                 strokeWidth={1.5}
-                strokeOpacity={0.6}
+                strokeOpacity={0.65}
               />
             );
           })}

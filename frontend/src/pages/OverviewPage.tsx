@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useDashboard, useHistory, useAlerts, useWeather } from '../hooks/useAirQuality';
 import { locationsApi } from '../api/endpoints';
-import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId, useIsDark } from '../stores/appStore';
 import { AQIGauge } from '../components/AQIGauge';
 import { AqiVisualFigure, getAqiFigureDetails } from '../components/AqiVisualFigure';
 import { PollutantCard } from '../components/ui/PollutantCard';
@@ -49,7 +49,61 @@ import {
 
 const DEFAULT_LOCATION_ID = 17; // R K Puram, Delhi - DPCC (Active CPCB ground station)
 
-function getCategoryAtmosphereStyle(category: string | undefined) {
+function getCategoryAtmosphereStyle(category: string | undefined, isDark: boolean = false) {
+  if (isDark) {
+    switch (category) {
+      case 'Good':
+        return {
+          cardBg: 'bg-gradient-to-br from-emerald-950/40 via-card to-emerald-950/15',
+          borderColor: 'border-emerald-700/60',
+          glowBg: 'rgba(0, 153, 102, 0.28)',
+          accentTag: 'bg-emerald-950/70 text-emerald-300 border border-emerald-700/60',
+        };
+      case 'Satisfactory':
+        return {
+          cardBg: 'bg-gradient-to-br from-lime-950/40 via-card to-lime-950/15',
+          borderColor: 'border-lime-700/60',
+          glowBg: 'rgba(85, 170, 0, 0.28)',
+          accentTag: 'bg-lime-950/70 text-lime-300 border border-lime-700/60',
+        };
+      case 'Moderate':
+        return {
+          cardBg: 'bg-gradient-to-br from-amber-950/40 via-card to-amber-950/15',
+          borderColor: 'border-amber-700/60',
+          glowBg: 'rgba(255, 222, 51, 0.22)',
+          accentTag: 'bg-amber-950/70 text-amber-300 border border-amber-700/60',
+        };
+      case 'Poor':
+        return {
+          cardBg: 'bg-gradient-to-br from-orange-950/40 via-card to-orange-950/15',
+          borderColor: 'border-orange-700/60',
+          glowBg: 'rgba(255, 126, 0, 0.28)',
+          accentTag: 'bg-orange-950/70 text-orange-300 border border-orange-700/60',
+        };
+      case 'Very Poor':
+        return {
+          cardBg: 'bg-gradient-to-br from-rose-950/45 via-card to-rose-950/15',
+          borderColor: 'border-rose-700/60',
+          glowBg: 'rgba(204, 0, 51, 0.32)',
+          accentTag: 'bg-rose-950/70 text-rose-300 border border-rose-700/60',
+        };
+      case 'Severe':
+        return {
+          cardBg: 'bg-gradient-to-br from-purple-950/50 via-card to-rose-950/25',
+          borderColor: 'border-purple-700/70',
+          glowBg: 'rgba(126, 0, 35, 0.4)',
+          accentTag: 'bg-purple-950/80 text-purple-200 border border-purple-700/70',
+        };
+      default:
+        return {
+          cardBg: 'bg-card',
+          borderColor: 'border-border',
+          glowBg: 'rgba(156, 163, 175, 0.1)',
+          accentTag: 'bg-muted text-muted-foreground border border-border',
+        };
+    }
+  }
+
   switch (category) {
     case 'Good':
       return {
@@ -105,6 +159,7 @@ function getCategoryAtmosphereStyle(category: string | undefined) {
 
 function HistoryAreaChart({ locationId }: { locationId: number }) {
   const { data, isLoading } = useHistory(locationId, 24, 'pm25');
+  const isDark = useIsDark();
 
   if (isLoading) return <div className="h-44 bg-muted/30 rounded-xl animate-pulse" />;
 
@@ -127,42 +182,54 @@ function HistoryAreaChart({ locationId }: { locationId: number }) {
     );
   }
 
+  const primaryColor = isDark ? '#10b981' : '#106644';
+  const gridColor = isDark ? '#21332a' : '#e2e8f0';
+  const tickColor = isDark ? '#8fa59b' : '#64748b';
+
   return (
     <ResponsiveContainer width="100%" height={190}>
       <AreaChart data={points} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
         <defs>
           <linearGradient id="pm25Gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#106644" stopOpacity={0.4} />
-            <stop offset="95%" stopColor="#106644" stopOpacity={0.02} />
+            <stop offset="5%" stopColor={primaryColor} stopOpacity={isDark ? 0.45 : 0.4} />
+            <stop offset="95%" stopColor={primaryColor} stopOpacity={0.01} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
         <XAxis
           dataKey="time"
-          tick={{ fontSize: 10, fill: '#64748b' }}
+          tick={{ fontSize: 10, fill: tickColor }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 10, fill: '#64748b' }}
+          tick={{ fontSize: 10, fill: tickColor }}
           axisLine={false}
           tickLine={false}
           unit=" µg"
         />
         <Tooltip
           contentStyle={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
+            backgroundColor: isDark ? '#111a16' : '#ffffff',
+            border: `1px solid ${isDark ? '#253930' : '#cbd5e1'}`,
             borderRadius: 12,
-            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+            boxShadow: isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 4px 14px rgba(0,0,0,0.08)',
             fontSize: 12,
+            color: isDark ? '#f3f7f5' : '#0f241d',
+          }}
+          itemStyle={{
+            color: isDark ? '#34d399' : '#106644',
+          }}
+          labelStyle={{
+            color: tickColor,
+            fontWeight: 600,
           }}
         />
         <Area
           type="monotone"
           dataKey="value"
           name="PM2.5 (µg/m³)"
-          stroke="#106644"
+          stroke={primaryColor}
           strokeWidth={2.5}
           fill="url(#pm25Gradient)"
           connectNulls={false}
@@ -174,6 +241,7 @@ function HistoryAreaChart({ locationId }: { locationId: number }) {
 
 export function OverviewPage() {
   const { selectedLocationId, setSelectedLocation, addRecentLocation, recentLocations } = useAppStore();
+  const isDark = useIsDark();
   const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : DEFAULT_LOCATION_ID;
 
   const [isInitialBoot, setIsInitialBoot] = useState<boolean>(() => {
@@ -310,7 +378,7 @@ export function OverviewPage() {
   const isSevereAir = aqi?.value !== undefined && aqi?.value !== null && aqi.value >= 150;
   const isAlertTriggered = !!userThresholdAlert || isSevereAir;
 
-  const atmosphereStyle = getCategoryAtmosphereStyle(aqi?.category ?? undefined);
+  const atmosphereStyle = getCategoryAtmosphereStyle(aqi?.category ?? undefined, isDark);
   const aqiColor = getAQIColorHex(aqi?.category as AQICategory);
   const figureDetails = getAqiFigureDetails(aqi?.category);
 

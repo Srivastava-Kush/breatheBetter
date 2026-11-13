@@ -11,7 +11,33 @@
     <meta name="description" content="Know Your Air. Protect Your Health. Real-time air quality monitoring, CPCB AQI calculation, forecasts, and health intelligence for India." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('breathebetter-store');
+          var isDark = false;
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            var mode = parsed && parsed.state && parsed.state.theme;
+            if (mode === 'dark') isDark = true;
+            else if (mode === 'light') isDark = false;
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) isDark = true;
+          } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            isDark = true;
+          }
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

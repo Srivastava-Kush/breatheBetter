@@ -3,6 +3,7 @@ import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import indiaBoundaryData from '../data/india-boundary.json';
 import indiaMaskData from '../data/india-mask.json';
+import { useIsDark } from '../stores/appStore';
 
 interface IndiaBoundaryLayerProps {
   highlight: boolean;
@@ -16,6 +17,7 @@ interface IndiaBoundaryLayerProps {
 export function IndiaBoundaryLayer({ highlight }: IndiaBoundaryLayerProps) {
   const map = useMap();
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const isDark = useIsDark();
 
   useEffect(() => {
     if (!map) return;
@@ -40,8 +42,8 @@ export function IndiaBoundaryLayer({ highlight }: IndiaBoundaryLayerProps) {
     // 1. Inverted World Mask - Dims everything outside India's borders
     const maskLayer = L.geoJSON(indiaMaskData as any, {
       style: {
-        fillColor: '#0f172a',
-        fillOpacity: 0.22,
+        fillColor: isDark ? '#000000' : '#0f172a',
+        fillOpacity: isDark ? 0.6 : 0.22,
         stroke: false,
       },
       interactive: false,
@@ -51,8 +53,8 @@ export function IndiaBoundaryLayer({ highlight }: IndiaBoundaryLayerProps) {
     const glowBorder = L.geoJSON(indiaBoundaryData as any, {
       style: {
         color: '#10b981',
-        weight: 5,
-        opacity: 0.35,
+        weight: isDark ? 6 : 5,
+        opacity: isDark ? 0.65 : 0.35,
         fill: false,
       },
       interactive: false,
@@ -61,7 +63,7 @@ export function IndiaBoundaryLayer({ highlight }: IndiaBoundaryLayerProps) {
     // 3. Crisp Sovereign National Frontier Boundary
     const nationalBorder = L.geoJSON(indiaBoundaryData as any, {
       style: {
-        color: '#047857',
+        color: isDark ? '#34d399' : '#047857',
         weight: 2.2,
         opacity: 0.95,
         fill: false,
@@ -72,8 +74,7 @@ export function IndiaBoundaryLayer({ highlight }: IndiaBoundaryLayerProps) {
     group.addLayer(maskLayer);
     group.addLayer(glowBorder);
     group.addLayer(nationalBorder);
-  }, [highlight]);
+  }, [highlight, isDark]);
 
   return null;
 }
-

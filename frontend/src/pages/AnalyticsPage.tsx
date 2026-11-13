@@ -14,7 +14,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useHistory, useAnomalies } from '../hooks/useAirQuality';
-import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId, useIsDark } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { POLLUTANT_DISPLAY } from '../types';
@@ -41,14 +41,26 @@ const TIME_RANGES = [
 
 const POLLUTANTS = ['pm25', 'pm10', 'no2', 'so2', 'co', 'o3'];
 
-const CHART_COLORS: Record<string, string> = {
+const CHART_COLORS_LIGHT: Record<string, string> = {
   pm25: '#009966',
-  pm10: '#3b82f6',
-  no2: '#8b5cf6',
-  so2: '#f59e0b',
-  co: '#ef4444',
-  o3: '#06b6d4',
+  pm10: '#2563eb',
+  no2: '#7c3aed',
+  so2: '#d97706',
+  co: '#dc2626',
+  o3: '#0891b2',
 };
+
+const CHART_COLORS_DARK: Record<string, string> = {
+  pm25: '#34d399',
+  pm10: '#60a5fa',
+  no2: '#a78bfa',
+  so2: '#fbbf24',
+  co: '#f87171',
+  o3: '#22d3ee',
+};
+
+const getChartColor = (pollutant: string, isDark: boolean = false): string =>
+  (isDark ? CHART_COLORS_DARK : CHART_COLORS_LIGHT)[pollutant] ?? (isDark ? '#34d399' : '#009966');
 
 function PollutantChart({
   locationId,
@@ -62,8 +74,9 @@ function PollutantChart({
   onOpenGuide?: (pollutant: string) => void;
 }) {
   const { data, isLoading } = useHistory(locationId, hours, pollutant);
+  const isDark = useIsDark();
   const display = POLLUTANT_DISPLAY[pollutant] ?? { label: pollutant.toUpperCase(), unit: '' };
-  const color = CHART_COLORS[pollutant] ?? '#009966';
+  const color = getChartColor(pollutant, isDark);
 
   if (isLoading) {
     return (
@@ -143,15 +156,24 @@ function PollutantChart({
 
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={points} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#21332a' : '#e2e8f0'} />
+          <XAxis dataKey="time" tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} />
+          <YAxis tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: 8,
+              backgroundColor: isDark ? '#111a16' : '#ffffff',
+              border: `1px solid ${isDark ? '#253930' : '#cbd5e1'}`,
+              borderRadius: 10,
               fontSize: 12,
+              color: isDark ? '#f3f7f5' : '#0f241d',
+              boxShadow: isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 4px 12px rgba(0,0,0,0.08)',
+            }}
+            itemStyle={{
+              color: color,
+            }}
+            labelStyle={{
+              color: isDark ? '#8fa59b' : '#64748b',
+              fontWeight: 600,
             }}
             formatter={(val: any) => [`${Number(val)?.toFixed(2)} ${display.unit}`, display.label]}
           />
@@ -160,7 +182,7 @@ function PollutantChart({
             dataKey="value"
             name={`${display.label} (${display.unit})`}
             stroke={color}
-            strokeWidth={2}
+            strokeWidth={2.5}
             dot={false}
             connectNulls={false}
           />
@@ -171,6 +193,7 @@ function PollutantChart({
 }
 
 export function AnalyticsPage() {
+  const isDark = useIsDark();
   const [hours, setHours] = useState(168);
   const [activePollutants, setActivePollutants] = useState(['pm25', 'pm10']);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -377,9 +400,9 @@ export function AnalyticsPage() {
                     ? 'border-transparent text-white shadow-xs'
                     : 'border-border text-muted-foreground hover:text-foreground bg-card'
                 }`}
-                style={active ? { backgroundColor: CHART_COLORS[p] } : {}}
+                style={active ? { backgroundColor: getChartColor(p, isDark) } : {}}
               >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[p] }} />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getChartColor(p, isDark) }} />
                 {display?.label ?? p.toUpperCase()}
               </button>
             );
@@ -396,7 +419,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm flex items-center gap-2">
                   <span
                     className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: CHART_COLORS[p] }}
+                    style={{ backgroundColor: getChartColor(p, isDark) }}
                   />
                   {POLLUTANT_DISPLAY[p]?.label ?? p.toUpperCase()} Historical Distribution
                 </CardTitle>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CloudSun, AlertCircle, Info, Cpu, Sparkles, Wind, Droplets, Gauge, ArrowRight } from 'lucide-react';
 import { useForecast, useMLPrediction } from '../hooks/useAirQuality';
-import { useAppStore, isSyntheticLocationId } from '../stores/appStore';
+import { useAppStore, isSyntheticLocationId, useIsDark } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { POLLUTANT_DISPLAY, type AQICategory } from '../types';
 import { getAQIColorHex } from '../utils';
@@ -20,6 +20,7 @@ import {
 
 export function ForecastPage() {
   const { selectedLocationId } = useAppStore();
+  const isDark = useIsDark();
   const locationId = (selectedLocationId && !isSyntheticLocationId(selectedLocationId)) ? selectedLocationId : 17;
   const [activeTab, setActiveTab] = useState<'openmeteo' | 'ml'>('ml');
   const [selectedPollutant, setSelectedPollutant] = useState('pm25');
@@ -217,16 +218,16 @@ export function ForecastPage() {
                         </linearGradient>
                       </defs>
 
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#21332a' : '#e2e8f0'} />
+                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} />
+                      <YAxis tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} domain={['auto', 'auto']} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
+                          backgroundColor: isDark ? '#111a16' : '#ffffff',
+                          border: `1px solid ${isDark ? '#253930' : '#cbd5e1'}`,
                           borderRadius: 10,
                           fontSize: 12,
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          boxShadow: isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 8px 24px rgba(0,0,0,0.12)',
                         }}
                         content={({ active, payload }) => {
                           if (!active || !payload || !payload.length) return null;
@@ -434,19 +435,28 @@ export function ForecastPage() {
                     <AreaChart data={openMeteoChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                       <defs>
                         <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          <stop offset="5%" stopColor={isDark ? '#60a5fa' : '#3b82f6'} stopOpacity={isDark ? 0.35 : 0.3} />
+                          <stop offset="95%" stopColor={isDark ? '#60a5fa' : '#3b82f6'} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#21332a' : '#e2e8f0'} />
+                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} />
+                      <YAxis tick={{ fontSize: 10, fill: isDark ? '#8fa59b' : '#64748b' }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: 8,
+                          backgroundColor: isDark ? '#111a16' : '#ffffff',
+                          border: `1px solid ${isDark ? '#253930' : '#cbd5e1'}`,
+                          borderRadius: 10,
                           fontSize: 12,
+                          color: isDark ? '#f3f7f5' : '#0f241d',
+                          boxShadow: isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 4px 12px rgba(0,0,0,0.08)',
+                        }}
+                        itemStyle={{
+                          color: isDark ? '#60a5fa' : '#2563eb',
+                        }}
+                        labelStyle={{
+                          color: isDark ? '#8fa59b' : '#64748b',
+                          fontWeight: 600,
                         }}
                         formatter={(val: any) => [
                           `${Number(val)?.toFixed(2) ?? 'N/A'} ${POLLUTANT_DISPLAY[selectedPollutant]?.unit ?? ''}`,
@@ -456,7 +466,7 @@ export function ForecastPage() {
                       <Area
                         type="monotone"
                         dataKey="value"
-                        stroke="#3b82f6"
+                        stroke={isDark ? '#60a5fa' : '#3b82f6'}
                         strokeWidth={2}
                         fill="url(#forecastGrad)"
                         dot={false}

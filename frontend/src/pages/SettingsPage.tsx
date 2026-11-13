@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import { Settings, Bell, Trash2, Plus } from 'lucide-react';
+import { Settings, Bell, Trash2, Plus, Sun, Moon, Monitor } from 'lucide-react';
 import { useAlerts, useCreateAlert, useDeleteAlert, useLocations } from '../hooks/useAirQuality';
 import { useAppStore } from '../stores/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Badge } from '../components/ui/Badge';
 
 export function SettingsPage() {
-  const { data: alertsData, isLoading } = useAlerts();
+  const { data: alertsData } = useAlerts();
   const createAlert = useCreateAlert();
   const deleteAlert = useDeleteAlert();
   const { data: locationsData } = useLocations({ limit: 50 });
+  const { theme, setTheme } = useAppStore();
 
   const [threshold, setThreshold] = useState('200');
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -40,9 +39,110 @@ export function SettingsPage() {
           Settings & Alerts
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Configure notifications, thresholds, and monitoring preferences
+          Configure notifications, appearance, and monitoring preferences
         </p>
       </div>
+
+      {/* Theme & Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sun className="w-4 h-4 text-primary" />
+            Appearance & Color Theme
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Select your preferred interface color mode. Custom optimized palettes are applied to cards, charts, gauges, and satellite/street map layers.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Light Mode */}
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                theme === 'light'
+                  ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary'
+                  : 'border-border bg-card hover:bg-muted/60'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
+                  <Sun className="w-4 h-4" />
+                </div>
+                {theme === 'light' && (
+                  <span className="text-[10px] font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-foreground">Light Theme</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Crisp daylight aesthetics with emerald accents
+                </div>
+              </div>
+            </button>
+
+            {/* Dark Mode */}
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                theme === 'dark'
+                  ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary'
+                  : 'border-border bg-card hover:bg-muted/60'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950/60 flex items-center justify-center text-emerald-400">
+                  <Moon className="w-4 h-4" />
+                </div>
+                {theme === 'dark' && (
+                  <span className="text-[10px] font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-foreground">Dark Theme</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Obsidian slate telemetry with neon luminescence
+                </div>
+              </div>
+            </button>
+
+            {/* System Default */}
+            <button
+              type="button"
+              onClick={() => setTheme('system')}
+              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                theme === 'system'
+                  ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary'
+                  : 'border-border bg-card hover:bg-muted/60'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-foreground">
+                  <Monitor className="w-4 h-4" />
+                </div>
+                {theme === 'system' && (
+                  <span className="text-[10px] font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-foreground">System Default</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Automatically syncs with your OS display mode
+                </div>
+              </div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Smart AQI Alerts */}
       <Card>

@@ -17,11 +17,13 @@ import {
   FileText,
   User,
   Bell,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { LocationSearch } from '../components/LocationSearch';
 import { locationsApi } from '../api/endpoints';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, useIsDark } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import type { Location } from '../types';
 
@@ -45,7 +47,8 @@ export function Layout() {
   const isMapPage = location.pathname === '/map';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { addRecentLocation, setSelectedLocation } = useAppStore();
+  const { addRecentLocation, setSelectedLocation, toggleTheme } = useAppStore();
+  const isDark = useIsDark();
   const { user, isAuthenticated } = useAuthStore();
 
   const handleLocationSelect = (loc: Location) => {
@@ -160,8 +163,27 @@ export function Layout() {
         </nav>
 
         <div className="p-3.5 border-t border-border/70 text-[11px] text-muted-foreground flex items-center justify-between bg-muted/20">
-          <span className="font-medium">CPCB Standard</span>
-          <span className="font-mono text-[10px] bg-card border border-border px-2 py-0.5 rounded-md font-semibold text-primary">v2.4 Live</span>
+          <div className="flex items-center gap-1.5 font-medium">
+            <span>CPCB Standard</span>
+            <span className="font-mono text-[10px] bg-card border border-border px-1.5 py-0.5 rounded text-primary font-semibold">v2.4</span>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-card border border-border/80 hover:bg-muted text-foreground transition-all text-[11px] font-semibold cursor-pointer shadow-2xs"
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {isDark ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Dark</span>
+              </>
+            )}
+          </button>
         </div>
       </aside>
 
@@ -209,6 +231,25 @@ export function Layout() {
                 </NavLink>
               ))}
             </nav>
+            <div className="p-4 border-t border-border/80 flex items-center justify-between bg-muted/20">
+              <span className="text-xs text-muted-foreground font-medium">Appearance</span>
+              <button
+                onClick={toggleTheme}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-foreground text-xs font-semibold shadow-2xs"
+              >
+                {isDark ? (
+                  <>
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4 text-emerald-600" />
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
+            </div>
           </aside>
         </div>
       )}
@@ -239,7 +280,27 @@ export function Layout() {
             )}
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Dark / Light Mode Switcher */}
+            <button
+              onClick={toggleTheme}
+              className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold flex items-center gap-2 shrink-0 transition-all shadow-2xs hover:scale-102 cursor-pointer"
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle color theme"
+            >
+              {isDark ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-180 duration-300" />
+                  <span className="hidden sm:inline text-xs font-medium">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-emerald-600 animate-in spin-in-180 duration-300" />
+                  <span className="hidden sm:inline text-xs font-medium">Dark</span>
+                </>
+              )}
+            </button>
+
             <NavLink
               to="/profile"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted text-foreground transition-all shadow-2xs"
@@ -260,11 +321,11 @@ export function Layout() {
               )}
             </NavLink>
 
-            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-[11px] font-semibold">
+            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>CPCB Ground Telemetry</span>
             </div>
-            <span className="text-[11px] text-muted-foreground hidden md:block">
+            <span className="text-[11px] text-muted-foreground hidden xl:block">
               OpenAQ · Open-Meteo
             </span>
           </div>

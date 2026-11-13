@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, useMap, Circle, Marker, Popup } from 'react-leaflet';
+import { MapContainer, useMap, Circle, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useLocations } from '../hooks/useAirQuality';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, useIsDark } from '../stores/appStore';
 import { getAQIColorHex, getAQICategory } from '../utils';
 import type { AQICategory, Location } from '../types';
 import {
@@ -24,6 +24,8 @@ import {
   Clock,
   Sparkles,
   Globe,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { CitySearch, SelectedCity } from '../components/CitySearch';
 import { CityAirQualityPanel } from '../components/CityAirQualityPanel';
@@ -38,6 +40,47 @@ const INDIA_BOUNDS: L.LatLngBoundsLiteral = [
   [37.5, 97.5],
 ];
 
+function DynamicTileLayer({ mode }: { mode: 'dark' | 'streets' | 'satellite' }) {
+  const map = useMap();
+
+  useEffect(() => {
+    let layer: L.TileLayer;
+
+    if (mode === 'dark') {
+      layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        className: 'leaflet-dark-tile-filter',
+      });
+    } else if (mode === 'satellite') {
+      layer = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        {
+          attribution: '&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics',
+          maxZoom: 18,
+          className: 'leaflet-normal-tile',
+        }
+      );
+    } else {
+      layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        className: 'leaflet-normal-tile',
+      });
+    }
+
+    layer.addTo(map);
+
+    return () => {
+      map.removeLayer(layer);
+    };
+  }, [mode, map]);
+
+  return null;
+}
+
 function FloatingMapControls({
   mapContainerRef,
   tileLayerType,
@@ -45,7 +88,7 @@ function FloatingMapControls({
   geoScope = 'india',
 }: {
   mapContainerRef: React.RefObject<HTMLDivElement | null>;
-  tileLayerType: 'streets' | 'satellite';
+  tileLayerType: 'dark' | 'streets' | 'satellite';
   onToggleTileLayer: () => void;
   geoScope?: 'india' | 'global';
 }) {
@@ -92,6 +135,12 @@ function FloatingMapControls({
     }
   };
 
+  const getTileLabel = () => {
+    if (tileLayerType === 'dark') return '🌙 Dark Canvas';
+    if (tileLayerType === 'streets') return '☀️ Daylight Streets';
+    return '🛰️ Satellite Imagery';
+  };
+
   return (
     <div className="absolute top-4 right-4 z-[1000] flex flex-col items-center gap-2 select-none">
       {/* Zoom In & Out */}
@@ -133,15 +182,25 @@ function FloatingMapControls({
         <RotateCcw className="w-4 h-4 text-foreground" />
       </button>
 
-      {/* Satellite Imagery / Street Map Toggle */}
+      {/* Layer Style Quick Cycle: Dark -> Streets -> Satellite */}
       <button
         onClick={onToggleTileLayer}
         className={`p-2.5 rounded-xl shadow-lg border border-border/80 bg-card/95 backdrop-blur-md hover:bg-muted transition-all hover:scale-105 ${
-          tileLayerType === 'satellite' ? 'text-emerald-700 bg-emerald-50 border-emerald-300' : 'text-foreground'
+          tileLayerType === 'dark'
+            ? 'text-emerald-400 bg-emerald-950/40 border-emerald-500/50'
+            : tileLayerType === 'satellite'
+            ? 'text-sky-400 bg-sky-950/40 border-sky-500/50'
+            : 'text-amber-500 bg-amber-500/10 border-amber-500/40'
         }`}
-        title={tileLayerType === 'satellite' ? 'Switch to Street Map' : 'Switch to Satellite Imagery'}
+        title={`Map Style: ${getTileLabel()} (Click to cycle)`}
       >
-        <Layers className="w-4 h-4" />
+        {tileLayerType === 'dark' ? (
+          <Moon className="w-4 h-4 text-emerald-400" />
+        ) : tileLayerType === 'satellite' ? (
+          <Layers className="w-4 h-4 text-sky-400" />
+        ) : (
+          <Sun className="w-4 h-4 text-amber-500" />
+        )}
       </button>
 
       {/* Fullscreen Toggle */}
@@ -225,6 +284,7 @@ function MapScopeController({ scope }: { scope: 'india' | 'global' }) {
 export function MapPage() {
   const navigate = useNavigate();
   const { setSelectedLocation } = useAppStore();
+  const isDark = useIsDark();
 
   // Geographic Scope: 'india' (default, individual pins, locked bounds) vs 'global' (clustered worldwide)
   const [geoScope, setGeoScope] = useState<'india' | 'global'>('india');
@@ -250,7 +310,22 @@ export function MapPage() {
   const [focusedStationId, setFocusedStationId] = useState<number | null>(null);
   const [viewportTargets, setViewportTargets] = useState<Array<[number, number]> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [tileLayerType, setTileLayerType] = useState<'streets' | 'satellite'>('streets');
+  const [tileLayerType, setTileLayerType] = useState<'dark' | 'streets' | 'satellite'>(() =>
+    isDark ? 'dark' : 'streets'
+  );
+
+  // Synchronize map tile mode when site theme changes (unless locked to satellite)
+  useEffect(() => {
+    setTileLayerType((prev) => (prev === 'satellite' ? prev : isDark ? 'dark' : 'streets'));
+  }, [isDark]);
+
+  const handleCycleTileLayer = () => {
+    setTileLayerType((prev) => {
+      if (prev === 'dark') return 'streets';
+      if (prev === 'streets') return 'satellite';
+      return 'dark';
+    });
+  };
 
   // Dynamically discovered stations from city searches
   const [searchedStations, setSearchedStations] = useState<Location[]>([]);
@@ -630,7 +705,7 @@ export function MapPage() {
       </div>
 
       {/* Interactive Map Canvas */}
-      <div ref={mapContainerRef} className="flex-1 relative bg-slate-100">
+      <div ref={mapContainerRef} className="flex-1 relative bg-background">
         <MapContainer
           center={INDIA_CENTER}
           zoom={5}
@@ -645,19 +720,8 @@ export function MapPage() {
           {/* Dynamic Map Scope & Bounds Controller */}
           <MapScopeController scope={geoScope} />
 
-          {tileLayerType === 'streets' ? (
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
-            />
-          ) : (
-            <TileLayer
-              attribution='&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={18}
-            />
-          )}
+          {/* Dynamic Leaflet Tile Layer Controller (Dark Canvas / Streets / Satellite) */}
+          <DynamicTileLayer mode={tileLayerType} />
 
           {/* India Sovereign Boundary & Dimming Mask (active in India scope) */}
           <IndiaBoundaryLayer highlight={highlightIndia && geoScope === 'india'} />
@@ -738,8 +802,8 @@ export function MapPage() {
               >
                 <Popup>
                   <div className="text-xs p-1">
-                    <strong className="text-sm font-bold text-gray-900">{selectedCity.name}</strong>
-                    <div className="text-gray-500">
+                    <strong className="text-sm font-bold text-foreground">{selectedCity.name}</strong>
+                    <div className="text-muted-foreground">
                       {[selectedCity.district, selectedCity.state, selectedCity.country].filter(Boolean).join(', ')}
                     </div>
                     <div className="mt-1 text-primary font-medium">Search Radius: {searchRadiusKm} km</div>
@@ -775,13 +839,11 @@ export function MapPage() {
             />
           )}
 
-          {/* Floating Geospatial Controls (Zoom, GPS, Reset, Satellite Toggle, Fullscreen) */}
+          {/* Floating Geospatial Controls (Zoom, GPS, Reset, Style Cycle, Fullscreen) */}
           <FloatingMapControls
             mapContainerRef={mapContainerRef}
             tileLayerType={tileLayerType}
-            onToggleTileLayer={() =>
-              setTileLayerType(tileLayerType === 'streets' ? 'satellite' : 'streets')
-            }
+            onToggleTileLayer={handleCycleTileLayer}
             geoScope={geoScope}
           />
         </MapContainer>
